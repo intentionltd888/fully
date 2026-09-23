@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- 硬化執行環境下要跑 /usr/bin/python3 子行程，並讓它載入自己的 framework。
+       沒有這兩條，公證過的 app 一啟動引擎就會被 dyld 擋下來。 -->
+  <key>com.apple.security.cs.allow-jit</key>                    <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>   <true/>
+</dict>
+</plist>

@@ -1,0 +1,65 @@
+Fully 內含下列開源元件（散布合規聲明）：
+
+CPython 3.12（python-build-standalone 組建，內嵌於 fully-engine）— PSF License 2.0
+  https://www.python.org ・組建來源 https://github.com/astral-sh/python-build-standalone
+  引擎自 v1.9 起凍成獨立執行檔，不再依賴使用者機器上的 Python。
+
+PyInstaller bootloader（fully-engine 的啟動殼）— GPL v2 with Bootloader Exception
+  https://pyinstaller.org ・依其例外條款，隨包散布的應用程式不受 GPL 傳染。
+
+Hover Zoom+（縮圖→原圖網址規則的參考來源）— MIT License
+  https://github.com/extesy/hoverzoom ・grab.py 的 CDN_RULES 有部分規則翻譯自其 plugins/。
+  Copyright (c) Hover Zoom+ contributors.
+
+QuickJS-ng 0.16.1（qjs，離線執行 maxurl 規則庫的 JavaScript 執行環境）— MIT License
+  https://github.com/quickjs-ng/quickjs ・自 v0.16.1 原始碼以 macOS 11 為最低目標自行編譯（arm64）。
+  Copyright (c) 2017-2021 Fabrice Bellard and Charlie Gordon; (c) 2023-2025 QuickJS-ng contributors.
+
+────────────────────────────────────────────────────────────
+Uiverse.io elements (interface styling) — MIT License
+────────────────────────────────────────────────────────────
+Fully's interface adapts the styling of three community elements from
+Uiverse.io (source mirror: https://github.com/uiverse-io/galaxy):
+
+  · "strong-zebra-87" by adamgiebl        — raised neumorphic surface
+  · "tricky-turtle-16" by Smit-Prajapati  — concentric ripple loader
+  · "neat-turkey-32" by AmIt-DasIT        — raised + inset radio state
+
+Copyright (c) Uiverse.io and the respective element authors.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Image Max URL（maxurl）2026.6.0（userscript_smaller.user.js，縮圖→原圖網址規則庫）— Apache License 2.0
+  https://github.com/qsniyg/maxurl ・取自 tag v2026.6.0（commit 89cef6985a65448251954338ea0f84c8d53585b1），
+  檔案未經修改（SHA-256 660a0877131c4d06444d9324565d0acc444452eae5f2fabc1f87e780244b58c3）。
+  由包內 QuickJS-ng（qjs）以子程序離線執行；載入殼 maxurl_runner.js 為 Fully 自寫，不含 maxurl 程式碼。
+  Copyright 2018-2024 qsniyg
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+  授權全文隨包在 Resources/maxurl/LICENSE-maxurl.txt（Apache-2.0 §4(a)）。

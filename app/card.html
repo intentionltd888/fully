@@ -1,0 +1,162 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Fully card</title>
+<style>
+  /* ───────────────────────────────────────────────────────────────
+     Fully 預覽卡：在任何地方複製網址，螢幕右上角浮出這張卡。
+
+     跟主面板同一套規矩（ui.html 檔頭）：材料色、四階字、凸＝可按／凹＝容器、藍 #003CFF 只給進度的頭、橘只給標記。
+     卡片浮在別的 app 上面，底下什麼顏色都有——所以外框不用軟浮雕的白高光（深色桌面上會變一圈髒白），
+     改用一層乾淨的落影＋一條細邊把它從背景裡拎出來；卡片「裡面」的東西照 Neu：縮圖是凹的框、主鍵是凸的膠囊。
+
+     四個狀態（body[data-s]）：ask 要抓嗎／run 抓的路上／done 存好了／err 抓不到
+     這張卡不搶焦點（non-activating panel）：使用者複製完可能還在打字，按鍵不會跑進這裡。
+     ─────────────────────────────────────────────────────────────── */
+  :root {
+    --material: #EEEFF2; --shade: 163,166,175; --hi: 255,255,255; --hi-a: .95; --lo-a: .45;
+    --ink: #282A2F; --ink-mid: #5F626A; --ink-off: #A2A5AD; --face: #E0E2E6; --face-deep: #D3D6DB;
+    --edge: rgba(40,42,47,.10); --drop: 0 8px 20px rgba(20,22,28,.16), 0 2px 6px rgba(20,22,28,.08);   /* 要在視窗邊（下 24、左右 16）淡到看不見 */
+    --blue: #003CFF; --brand: #FF6A13;
+    --raise-sm: -3px -3px 6px rgba(var(--hi),var(--hi-a)), 3px 3px 6px rgba(var(--shade),var(--lo-a));
+    --deboss: inset 3px 3px 6px rgba(var(--shade),var(--lo-a)), inset -3px -3px 6px rgba(var(--hi),var(--hi-a));
+    --font: -apple-system, "PingFang TC", sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --material: #2A2C31; --shade: 0,0,0; --hi-a: .06; --lo-a: .55; --ink: #E6E7EA; --ink-mid: #A8ABB3; --ink-off: #6B6E76;
+            --face: #34373D; --face-deep: #2C2F35; --edge: rgba(255,255,255,.09); --drop: 0 8px 20px rgba(0,0,0,.40), 0 2px 6px rgba(0,0,0,.24);
+            color-scheme: dark; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: transparent; overflow: hidden; height: 100%; }
+  body { font-family: var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; user-select: none; cursor: default; }
+
+  .card { position: absolute; left: 16px; right: 16px; top: 12px; height: 104px; border-radius: 24px; background: var(--material);
+          box-shadow: var(--drop), 0 0 0 1px var(--edge); display: flex; align-items: center; gap: 16px; padding: 0 16px 0 16px;
+          transform: translateX(0); opacity: 1; transition: transform .32s cubic-bezier(.2,.8,.2,1), opacity .32s ease; overflow: hidden; }
+  body.away .card { transform: translateX(24px); opacity: 0; }
+
+  /* 縮圖：凹的框（等東西放進來）→ 圖來了鋪滿 */
+  .thumb { flex: 0 0 72px; height: 72px; border-radius: 16px; box-shadow: var(--deboss); position: relative; overflow: hidden; display: grid; place-items: center; }
+  .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .3s ease; }
+  .thumb img.on { opacity: 1; }
+  .thumb .mk { width: 22px; height: 22px; opacity: .9; }
+  .thumb .mk path { fill: var(--brand); }
+  body.loading .thumb::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(100deg, transparent 30%, rgba(var(--hi), calc(var(--hi-a) * .55)) 50%, transparent 70%);
+    background-size: 220% 100%; animation: sheen 1.3s ease-in-out infinite; }
+  @keyframes sheen { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+
+  .txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-right: 4px; }
+  .l1 { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 16px; color: var(--ink-mid); white-space: nowrap; }
+  .l1 svg { width: 11px; height: 11px; flex: 0 0 auto; } .l1 svg path { fill: var(--brand); }
+  .l1 .lab { overflow: hidden; text-overflow: ellipsis; }
+  .chip { flex: 0 0 auto; font-size: 11px; line-height: 16px; padding: 0 8px; border-radius: 999px; box-shadow: var(--deboss); color: var(--ink-mid); }
+  .t { font-weight: 600; font-size: 15px; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m { font-size: 13px; line-height: 20px; color: var(--ink-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  body[data-s="err"] .m { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
+  /* 右欄：主鍵（凸的膠囊＝可以按）；抓的路上換成進度環（頭是藍點）；存好了是「打開看看」 */
+  .act { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; min-width: 84px; }
+  .btn { height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--material); box-shadow: var(--raise-sm);
+         font: 600 13px/20px var(--font); color: var(--ink); cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
+         transition: box-shadow .14s ease-out, transform .14s ease-out; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { box-shadow: var(--deboss); transform: none; }
+  .btn svg { width: 15px; height: 15px; } .btn svg * { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .ring { width: 40px; height: 40px; border-radius: 50%; position: relative; display: none;
+          background: conic-gradient(var(--ink) calc(var(--p, 0) * 1%), rgba(var(--shade), .28) 0); }
+  .ring::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--material); }
+  .ring .hd { position: absolute; inset: 0; transform: rotate(calc(var(--p, 0) * 3.6deg)); z-index: 2; }
+  .ring .hd::before { content: ""; position: absolute; left: 50%; top: -1px; width: 7px; height: 7px; margin-left: -3.5px; border-radius: 50%; background: var(--blue); }
+  body.spin .ring { background: conic-gradient(var(--ink) 20%, rgba(var(--shade), .28) 0); animation: spin 1s linear infinite; }
+  body.spin .ring .hd { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  body[data-s="run"] .btn { display: none; }
+  body[data-s="run"] .ring { display: block; }
+
+  .x { position: absolute; top: 8px; right: 10px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: transparent; color: var(--ink-off);
+       display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .2s ease, color .2s ease; }
+  .card:hover .x { opacity: 1; }
+  .x:hover { color: var(--ink); }
+  .x svg { width: 12px; height: 12px; } .x svg * { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+
+  /* 自動收起的倒數：卡片底緣一條細線，滑鼠停在卡上就停 */
+  .clock { position: absolute; left: 24px; right: 24px; bottom: 0; height: 2px; border-radius: 2px; background: rgba(var(--shade), .45);
+           transform-origin: left center; transform: scaleX(0); }
+  body.counting .clock { animation: drain var(--dur, 9s) linear forwards; }
+  body.hover .clock { animation-play-state: paused; }
+  @keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  @media (prefers-reduced-motion: reduce) { .card, .thumb img { transition: none; } body.loading .thumb::after { animation: none; } }
+</style>
+
+<div class="card" id="card">
+  <div class="thumb" id="thumb">
+    <svg class="mk" viewBox="0 0 10 10" aria-hidden="true"><path d="M7 0h3v10H7ZM0 7h10v3H0ZM4 7L7 7A7 7 0 0 0 0 0L0 3A4 4 0 0 1 4 7Z"/></svg>
+    <img id="img" alt="">
+  </div>
+  <div class="txt">
+    <div class="l1"><svg viewBox="0 0 10 10"><path d="M7 0h3v10H7ZM0 7h10v3H0ZM4 7L7 7A7 7 0 0 0 0 0L0 3A4 4 0 0 1 4 7Z"/></svg><span class="lab" id="lab"></span><span class="chip" id="chip" hidden></span></div>
+    <div class="t" id="t"></div>
+    <div class="m" id="m"></div>
+  </div>
+  <div class="act">
+    <button class="btn" id="btn"><svg viewBox="0 0 24 24"><path d="M12 4.5V14"/><path d="M7.8 10.4 12 14.6l4.2-4.2"/><path d="M6 19h12"/></svg><span id="btnTxt"></span></button>
+    <div class="ring" id="ring"><span class="hd"></span></div>
+  </div>
+  <button class="x" id="x" aria-label="close"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <div class="clock"></div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const send = (action, p = {}) => window.webkit?.messageHandlers?.card?.postMessage({ action, ...p });
+  let S = { state: 'ask', btn: 'grab' }, lang = 'zh';
+  const W = {
+    zh: { grab: '抓下來', open: '打開看看', panel: '打開 Fully', close: '關掉' },
+    en: { grab: 'Grab', open: 'Open', panel: 'Open Fully', close: 'Close' },
+  };
+  const w = k => (W[lang] || W.zh)[k] || k;
+
+  // Swift → 卡片：window.card.set({...})；只給有變的欄位也行
+  window.card = {
+    set(p) {
+      S = { ...S, ...p };
+      if (p.lang) lang = p.lang;
+      document.body.dataset.s = S.state;
+      document.body.classList.toggle('loading', !!S.loading);
+      document.body.classList.toggle('spin', S.state === 'run' && !(S.frac >= 0));
+      $('lab').textContent = S.label || '';
+      $('t').textContent = S.title || '';
+      $('m').textContent = S.meta || '';
+      $('chip').hidden = !S.chip; $('chip').textContent = S.chip || '';
+      $('btnTxt').textContent = w(S.btn || 'grab');
+      $('btn').querySelector('svg').style.display = (S.btn || 'grab') === 'grab' ? '' : 'none';
+      $('x').setAttribute('aria-label', w('close'));
+      if (S.frac >= 0) { $('ring').style.setProperty('--p', Math.max(2, Math.min(100, S.frac * 100))); }
+      if ('thumb' in p) {
+        const img = $('img');
+        if (!p.thumb) { img.classList.remove('on'); img.removeAttribute('src'); }
+        else if (img.getAttribute('src') !== p.thumb) {
+          img.classList.remove('on');
+          img.onload = () => img.classList.add('on');
+          img.onerror = () => img.classList.remove('on');
+          img.src = p.thumb;
+        }
+      }
+      if ('countdown' in p) {                    // 秒數；0＝停
+        document.body.classList.remove('counting'); void document.body.offsetWidth;
+        if (p.countdown > 0) { document.body.style.setProperty('--dur', p.countdown + 's'); document.body.classList.add('counting'); }
+      }
+    },
+    away(on) { document.body.classList.toggle('away', !!on); },
+    hover(on) { document.body.classList.toggle('hover', !!on); },
+  };
+  $('btn').onclick = () => send(S.btn || 'grab');
+  $('x').onclick = e => { e.stopPropagation(); send('close'); };
+  $('thumb').onclick = () => { if (S.state === 'done') send('open'); };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') send('close'); });
+  send('ready');
+})();
+</script>

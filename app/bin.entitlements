@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Resources/bin 的執行檔用：fully-engine 是 PyInstaller 單檔，啟動時自解壓到暫存再載入自己的（未簽）動態庫。
+       硬化執行環境下沒這三條，公證過的包一跑就被 dyld 擋。其他靜態連結的工具不需要，共用無害。 -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key> <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>       <true/>
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key> <true/>
+</dict>
+</plist>

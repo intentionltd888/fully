@@ -1,0 +1,1003 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Fully</title>
+<style>
+  /* ───────────────────────────────────────────────────────────────
+     Fully 的主面板。
+
+     一個畫面只有一顆主鍵。由上而下三件事：什麼（網址）→ 做（主鍵）→ 結果（一句話）。
+     其餘（最近抓的、設定、能做什麼）各自一頁，平常看不到。
+       網址卡＝預覽（縮圖、名稱、幾張、能拿到多大、抓過沒）；多張時多一個「挑幾張」文字鍵
+       結果＝多一行「拿到多大」（凹的膠囊：尺寸＋頁面上那張的幾倍）；單張圖原圖直接進剪貼簿
+       完成的縮圖、最近抓的可以直接拖出去；最近抓的頁有一個分頁「追蹤中」
+       中文／English：data-i18n 的元素整塊換、JS 裡的句子走 tr()
+
+     造型來源（不發明；三顆都是 Uiverse.io／MIT，署名在 THIRD-PARTY-NOTICES）：
+       R1 adamgiebl／strong-zebra-87      大圓角凸起板、寬柔雙向影      ＝可以按：主鍵待命、網址卡、主要動作鍵
+       R2 Smit-Prajapati／tricky-turtle-16 五層同心漣漪、頂緣高光、0.2s 錯拍 ＝正在做：主鍵下載中（全介面只有這裡會動）
+       R3 AmIt-DasIT／neat-turkey-32      外凸內凹並存、放大 1.1        ＝選了／做完了：四選一、外觀、完成的主鍵
+
+     規矩（改這個檔先讀）：
+       形狀只有三種：圓／膠囊 999／方塊 24（鍵帽是圖示，例外 8；縮圖 12／16）
+       字只有四階：28 大字／15 標題／13 內文／11 註記；字色兩階 ink／ink-mid，ink-off 只給「不能按」
+       影只有四種：raise-lg／raise-sm／deboss／checked。凸＝可按、凹＝容器或已選、平＝不能按
+       間距走 4 的倍數（4／8／12／16／20／28／40）；左右邊界 28；物件走中軸、文字掛左緣
+       藍 #003CFF 全畫面一處：進度的頭。實心，只在下載中與剛完成
+       橘 #FF6A13（品牌橘）只給右上角與精靈的字標；按鈕不上色——可不可按靠凸凹，橘在材料白上只有 2.5:1，當互動元素不夠
+       句子手動斷行，不留孤字
+     ─────────────────────────────────────────────────────────────── */
+
+
+  :root {
+    --material: #EEEFF2;
+    --shade: 163,166,175; --hi: 255,255,255; --hi-a: .95; --lo-a: .45; --ring-a: .95;
+    --ink: #282A2F; --ink-mid: #5F626A; --ink-off: #A2A5AD;       /* mid 5.31:1；off 只給不能按 */
+    --face: #E0E2E6; --face-deep: #D3D6DB;
+    --hair: rgba(163,166,175,.30);
+    --blue: #003CFF; --wm: invert(1);
+    --brand: #FF6A13;                                             /* 品牌橘：只給字標（亮暗同色；對材料白 2.5:1、對暗材料 5:1，標誌可、小字不可） */
+    --font: -apple-system, "PingFang TC", sans-serif;
+    --mono: "SF Mono", "Menlo", monospace;
+    --raise-lg: -10px -10px 20px rgba(var(--hi),var(--hi-a)), 10px 10px 20px rgba(var(--shade),var(--lo-a));
+    --raise-sm: -3px -3px 6px rgba(var(--hi),var(--hi-a)), 3px 3px 6px rgba(var(--shade),var(--lo-a));
+    --deboss:   inset 3px 3px 6px rgba(var(--shade),var(--lo-a)), inset -3px -3px 6px rgba(var(--hi),var(--hi-a));
+    --checked:  3px 3px 6px rgba(var(--shade),var(--lo-a)), -3px -3px 6px rgba(var(--hi),var(--hi-a)),
+                inset 3px 3px 6px rgba(var(--shade),var(--lo-a)), inset -3px -3px 6px rgba(var(--hi),var(--hi-a));
+    color-scheme: light;
+  }
+  :root[data-theme="dark"], :root:not([data-theme="light"]).sysdark {
+    --material: #2A2C31;
+    --shade: 0,0,0; --hi-a: .06; --lo-a: .55; --ring-a: .35;
+    --ink: #E6E7EA; --ink-mid: #A8ABB3; --ink-off: #6B6E76;       /* mid 6.08:1 */
+    --face: #34373D; --face-deep: #2C2F35;
+    --hair: rgba(255,255,255,.07); --wm: none;
+    --checked:  3px 3px 6px rgba(0,0,0,.55), -1px -1px 4px rgba(255,255,255,.16),
+                inset 3px 3px 6px rgba(0,0,0,.55), inset -1px -1px 4px rgba(255,255,255,.16);   /* R3 原值 .5，收到 .16 */
+    color-scheme: dark;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body { position: relative; font-family: var(--font); color: var(--ink); background: var(--material);
+         -webkit-font-smoothing: antialiased; user-select: none; cursor: default; }
+  body.dropping { box-shadow: inset 0 0 0 2px var(--ink-mid); }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  button:disabled { cursor: default; }
+  .hide { display: none !important; }
+
+  .t-display { font-weight: 600; font-size: 28px; line-height: 36px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t-title   { font-weight: 600; font-size: 15px; line-height: 22px; }
+  .t-body    { font-weight: 400; font-size: 13px; line-height: 20px; color: var(--ink-mid); }
+  .t-cap     { font-weight: 400; font-size: 11px; line-height: 16px; color: var(--ink-mid); }
+  .one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  svg { width: 20px; height: 20px; display: block; flex: 0 0 auto; }
+  svg * { stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  .app { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 12px 28px 20px; }
+  .top { flex: 0 0 28px; display: flex; justify-content: flex-end; align-items: flex-start; }
+  .top .w, .wtop .w { display: block; height: 20px; width: 36.6px; fill: var(--brand); }
+  .top .w path, .wtop .w path { fill: var(--brand); stroke: none; }   /* 蓋掉上面「svg * 只描邊」的全域規則，字標要實心 */   /* 字標＝品牌正本向量（4_品牌/標準字/fully_logotype_v1_word.svg），不打字 */
+
+  /* ① 什麼：空＝凹槽（等東西放進來）；有＝凸起的卡（R1）。卡片就是預覽（縮圖＋名稱＋幾張／能拿到多大） */
+  .what { flex: 0 0 64px; margin-top: 12px; border-radius: 24px; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 20px; }
+  .what.slot { box-shadow: var(--deboss); }
+  .what.card { box-shadow: var(--raise-lg); padding-left: 12px; }
+  .what.slot .tile, .what.slot .txt, .what.slot .x, .what.card textarea, .what.card #pasteBtn { display: none; }
+  .what.nudge { animation: nudge .5s ease; }
+  @keyframes nudge { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  textarea { flex: 1 1 auto; min-width: 0; height: 20px; resize: none; border: 0; outline: 0; background: transparent; overflow: hidden; white-space: nowrap;
+             font-family: var(--font); font-size: 13px; line-height: 20px; color: var(--ink); user-select: text; cursor: text; }
+  textarea::placeholder { color: var(--ink-mid); }
+  .tile { flex: 0 0 40px; height: 40px; border-radius: 50%; box-shadow: var(--deboss); display: grid; place-items: center; position: relative; overflow: hidden; }
+  .tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .3s ease; -webkit-user-drag: none; }
+  .tile.pic { border-radius: 12px; }
+  .tile.pic img.on { opacity: 1; }
+  .tile.pic > svg { opacity: 0; }
+  .tile.drag { cursor: grab; }
+  .what .txt { flex: 1 1 auto; min-width: 0; }
+  .what .txt .t-cap.url { font-family: var(--mono); }
+  .x { flex: 0 0 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-mid); }
+  .x:hover { color: var(--ink); }
+  body[data-state="run"] .x { display: none; }
+  .cap-key { flex: 0 0 auto; height: 40px; padding: 0 20px; border-radius: 999px; box-shadow: var(--raise-sm); display: inline-flex; align-items: center; gap: 8px;
+             font-weight: 600; font-size: 13px; color: var(--ink); background: var(--material); transition: box-shadow .14s ease-out; white-space: nowrap; }
+  .cap-key:active { box-shadow: var(--deboss); }
+  .cap-key:disabled { box-shadow: none; color: var(--ink-off); }
+  .cap-key svg { width: 16px; height: 16px; }
+  .cap-key.sm { height: 32px; padding: 0 12px; }
+  .cap-key.lg { box-shadow: var(--raise-lg); }
+  .cap-key.lg:active { box-shadow: var(--deboss); }
+  .cap-key.lg:disabled { box-shadow: none; }
+
+  /* ② 做：主鍵。舞台 224、核心 96 */
+  .stagebox { flex: 0 0 224px; width: 224px; margin: 20px auto 0; position: relative; }
+  .ring { position: absolute; border-radius: 50%; opacity: 0; pointer-events: none; transition: opacity .4s ease;
+          background: linear-gradient(0deg, rgba(var(--shade),.10), rgba(var(--hi),.05)), var(--material);
+          border-top: 1px solid rgba(var(--hi), calc(var(--ring-a) * var(--b)));
+          box-shadow: 0 10px 10px rgba(var(--shade), .30); }
+  .ring:nth-child(1) { inset: 0;    --b: .2; z-index: 1; --d: .8s; }
+  .ring:nth-child(2) { inset: 16px; --b: .4; z-index: 2; --d: .6s; }
+  .ring:nth-child(3) { inset: 32px; --b: .6; z-index: 3; --d: .4s; }
+  .ring:nth-child(4) { inset: 48px; --b: .8; z-index: 4; --d: .2s; }
+  .core { position: absolute; inset: 64px; z-index: 5; border-radius: 50%; display: block; width: 96px; height: 96px; }
+  .mount { position: absolute; inset: 0; border-radius: 50%; background: var(--material); box-shadow: var(--raise-lg); transition: box-shadow .25s ease; }
+  .face { position: absolute; inset: 10px; border-radius: 50%; background: linear-gradient(135deg, var(--face), var(--face-deep));
+          box-shadow: 0 2px 4px rgba(var(--shade),.38); display: grid; place-items: center; color: var(--ink); transition: transform .14s ease-out; }
+  .core:active .face { transform: scale(.97); }
+  .face svg { width: 28px; height: 28px; grid-area: 1 / 1; display: none; } .face svg * { stroke-width: 2.2; }
+  .face .sq { width: 16px; height: 16px; border-radius: 4px; background: var(--ink); grid-area: 1 / 1; display: none; }
+  body[data-o="off"] .g-dl, body[data-o="on"] .g-dl, body[data-o="run"] .sq, body[data-o="done"] .g-ok, body[data-o="retry"] .g-re { display: block; }
+  .arc { position: absolute; inset: 3px; border-radius: 50%; display: none;
+         background: conic-gradient(var(--ink) calc(var(--p, 0) * 1%), rgba(var(--shade), .30) 0); }
+  .arc::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--material); }
+  .head { position: absolute; inset: 3px; display: none; transform: rotate(calc(var(--p, 0) * 3.6deg)); z-index: 2; pointer-events: none; }
+  .head::before { content: ""; position: absolute; left: 50%; top: -2px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--blue); }
+  .olabel { position: absolute; left: -40px; right: -40px; top: 172px; text-align: center; font-weight: 600; font-size: 13px; line-height: 20px; color: var(--ink); z-index: 6; pointer-events: none; }
+
+  body[data-o="off"] .mount { box-shadow: none; }
+  body[data-o="off"] .face  { background: none; box-shadow: var(--deboss); color: var(--ink-off); }
+  body[data-o="off"] .olabel { color: var(--ink-off); }
+  body[data-o="run"] .ring { opacity: 1; animation: ripple 2s var(--d) infinite ease-in-out; }
+  body[data-o="run"] .core { animation: ripple 2s 0s infinite ease-in-out; }
+  body[data-o="run"] .mount { box-shadow: none; }
+  body[data-o="run"] .olabel { display: none; }
+  body[data-o="run"] .arc, body[data-o="run"] .head, body[data-o="done"] .head { display: block; }
+  body.resolving .arc { background: conic-gradient(var(--ink) 18%, rgba(var(--shade), .30) 0); animation: spin 1.05s linear infinite; }
+  body.resolving .head { display: none; }
+  body[data-o="done"] .mount { box-shadow: var(--checked); }
+  body[data-o="done"] .face  { background: none; box-shadow: none; }
+  @keyframes ripple { 0%,100% { transform: scale(1); box-shadow: 0 10px 10px rgba(var(--shade),.30); }
+                      50%     { transform: scale(1.1); box-shadow: 0 24px 18px rgba(var(--shade),.30); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* 截圖用：WebView 不在視窗裡時動畫不跑，把漣漪停在半途 */
+  body.freeze .ring, body.freeze .core { animation-play-state: paused !important; }
+  body.freeze .core { animation-delay: -.8s !important; }
+  body.freeze .ring:nth-child(4) { animation-delay: -.6s !important; } body.freeze .ring:nth-child(3) { animation-delay: -.4s !important; }
+  body.freeze .ring:nth-child(2) { animation-delay: -.2s !important; } body.freeze .ring:nth-child(1) { animation-delay: 0s !important; }
+  body.freeze, body.freeze * { transition: none !important; }
+  @media (prefers-reduced-motion: reduce) { .ring, .core { animation: none !important; } }
+
+  /* ③ 結果：文字掛左緣，一次只回答一件事 */
+  .zone { flex: 1 1 auto; min-height: 0; margin-top: 12px; display: flex; flex-direction: column; }   /* 不設 overflow hidden：會把「打開看看」的影裁出一條硬邊 */
+  .zone > * { flex-shrink: 0; }                     /* 內容不准被擠扁（完成畫面有「拿到多大」，高度剛好 184） */
+  .zone #sub, .zone #nameLine { margin-top: 8px; }
+  .zone #nameLine { color: var(--ink); }
+  .zone #nameLine + #sub { margin-top: 0; }
+  .zone #sub, .zone #note { max-width: 330px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+  .fails .t-body { display: flex; gap: 8px; }
+  .acts { margin-top: 16px; display: flex; align-items: center; gap: 20px; flex-wrap: nowrap; }   /* 不准換行：換了會壓到頁尾（英文字比較長） */
+  .acts > .link { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .link { font-size: 13px; line-height: 20px; color: var(--ink-mid); white-space: nowrap; }
+  .link:hover { color: var(--ink); }
+  .link.on { color: var(--ink); font-weight: 600; cursor: default; }
+  #pickLink { align-self: flex-start; margin-top: 8px; }
+
+  /* 「拿到多大」：凹的膠囊（容器）＝尺寸＋頁面上那張的幾倍。量的是真的存下來的檔 */
+  .proof { margin-top: 12px; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px 0 10px;
+           border-radius: 999px; box-shadow: var(--deboss); font-size: 13px; line-height: 20px; white-space: nowrap; max-width: 344px; overflow: hidden; }
+  .proof svg { width: 16px; height: 16px; color: var(--ink-mid); }
+  .proof b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .proof span { color: var(--ink-mid); overflow: hidden; text-overflow: ellipsis; }
+  .tipline { margin-top: 8px; }
+
+  /* ④ 其他：一行分散，左｜中｜右 */
+  .foot { flex: 0 0 24px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+  .foot button { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 20px; color: var(--ink-mid); }
+  .foot button:hover { color: var(--ink); }
+  .foot button svg { width: 16px; height: 16px; }
+  .foot .l { justify-self: start; } .foot .r { justify-self: end; }
+  .pb { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 16px; color: var(--ink-mid); }
+  .pb img { display: block; height: 8px; width: auto; filter: var(--wm); }   /* 字標是白版 PNG；淺色底反相成黑。file:// 下 CSS mask 會被跨來源規則擋掉，所以用 img */
+
+  .toast { position: absolute; left: 28px; right: 28px; bottom: 56px; z-index: 30; text-align: center; opacity: 0; transition: opacity .3s ease; pointer-events: none; }
+  .toast.on { opacity: 1; }
+
+  /* 次頁：最近抓的／設定／能做什麼／挑幾張／文件 */
+  .page { position: absolute; inset: 0; z-index: 9; background: var(--material); padding: 52px 28px 20px; display: none; flex-direction: column; }
+  .page.on { display: flex; }
+  .page .hd { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .page .hd .t-display { min-width: 0; }
+  .page .bd { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .page .bd::-webkit-scrollbar { width: 0; }
+  .page .ft { flex: 0 0 auto; padding-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .row { display: flex; align-items: center; gap: 12px; min-height: 56px; border-top: 1px solid var(--hair); width: 100%; text-align: left; }
+  .row.col { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 0 16px; }
+  .row .l { flex: 1 1 auto; min-width: 0; }
+  .row .l .t-body { color: var(--ink); }
+  .row .tile { flex: 0 0 40px; height: 40px; color: var(--ink-mid); border-radius: 12px; }
+  .row .tile svg { width: 16px; height: 16px; }
+  .row .go { color: var(--ink-mid); }
+  .row.split { justify-content: space-between; }
+  .row .mini { flex: 0 0 auto; }
+  .sec { font-size: 11px; line-height: 16px; color: var(--ink-mid); margin: 20px 0 4px; }
+  .sw { flex: 0 0 44px; height: 24px; border-radius: 999px; box-shadow: var(--deboss); position: relative; }
+  .sw i { position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--material); box-shadow: var(--raise-sm); transition: left .2s ease, background .2s ease; }
+  .sw.on i { left: 24px; background: var(--ink); box-shadow: none; }
+  .seg { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+  .seg button { height: 32px; padding: 0 12px; border-radius: 999px; box-shadow: var(--raise-sm); font-size: 13px; color: var(--ink-mid); transition: box-shadow .3s; }
+  .seg button.on { box-shadow: var(--checked); color: var(--ink); font-weight: 600; }
+  .sites .t-body { margin-bottom: 16px; }
+  .sites .t-body b { font-weight: 600; color: var(--ink); }
+  .bm { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 999px; box-shadow: var(--raise-sm);
+        font-weight: 600; font-size: 13px; color: var(--ink); text-decoration: none; cursor: grab; }
+  .bm svg { width: 14px; height: 14px; } .bm svg path { fill: var(--brand); stroke: none; }
+  .tabs { display: inline-flex; gap: 8px; margin-bottom: 8px; }
+  .tabs button { height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; color: var(--ink-mid); }
+  .tabs button.on { box-shadow: var(--checked); color: var(--ink); font-weight: 600; }
+
+  /* 挑幾張：縮圖格，預設全選（選了＝R3 已選的影＋勾） */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 4px 2px 12px; }
+  .cell { position: relative; aspect-ratio: 1 / 1; border-radius: 16px; box-shadow: var(--raise-sm); overflow: hidden; transition: box-shadow .2s, transform .2s; }
+  .cell img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; }
+  .cell .no { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-off); font-size: 11px; }
+  .cell .ck { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--material); box-shadow: var(--raise-sm); display: grid; place-items: center; }
+  .cell .ck svg { width: 12px; height: 12px; opacity: 0; } .cell .ck svg * { stroke-width: 3; }
+  .cell.on { box-shadow: var(--checked); transform: scale(.96); }
+  .cell.on .ck svg { opacity: 1; }
+  .cell:not(.on) img { opacity: .45; }
+  .cell .cap { position: absolute; left: 6px; right: 6px; bottom: 6px; font-size: 11px; line-height: 14px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* 文件頁（使用規範、隱私）：極簡 Markdown */
+  .doc h2 { font-weight: 600; font-size: 15px; line-height: 22px; color: var(--ink); margin: 20px 0 8px; }
+  .doc h3 { font-weight: 600; font-size: 13px; line-height: 20px; color: var(--ink); margin: 16px 0 4px; }
+  .doc p, .doc li { font-size: 13px; line-height: 20px; color: var(--ink-mid); user-select: text; cursor: text; }
+  .doc p { margin: 0 0 8px; }
+  .doc ul, .doc ol { margin: 0 0 8px 20px; }
+  .doc code { font-family: var(--mono); font-size: 11px; }
+  .doc b { color: var(--ink); font-weight: 600; }
+  .doc hr { border: 0; border-top: 1px solid var(--hair); margin: 16px 0; }
+  .doc table { border-collapse: collapse; margin: 8px 0 12px; font-size: 11px; line-height: 16px; color: var(--ink-mid); }
+  .doc td, .doc th { border-top: 1px solid var(--hair); padding: 4px 8px 4px 0; text-align: left; vertical-align: top; }
+  .doc th { color: var(--ink); font-weight: 600; }
+
+  /* 鍵帽：講到按鍵一律畫鍵帽（符號＋英文鍵名） */
+  .kb { display: inline-flex; gap: 8px; align-items: center; vertical-align: middle; }
+  .kc { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 60px; height: 44px; border-radius: 8px; box-shadow: var(--raise-sm); }
+  .kc .s { font-weight: 600; font-size: 15px; line-height: 16px; color: var(--ink); }
+  .kc .n { font-size: 11px; line-height: 14px; color: var(--ink-mid); }
+  .kc.letter { width: 44px; }
+  .kb.sm .kc { width: 32px; height: 28px; } .kb.sm .kc .n { display: none; } .kb.sm .kc .s { font-size: 13px; }
+  .g-orb, .g-dock { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; vertical-align: middle; margin: 0 4px; box-shadow: var(--raise-sm); }
+  .g-orb svg { width: 12px; height: 12px; } .g-orb svg * { stroke-width: 2.4; }
+  .g-dock { border-radius: 8px; } .g-dock i { display: block; width: 12px; height: 12px; border-radius: 3px; background: var(--brand); }
+  .g-dot { display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin: 0 4px; } .g-dot svg { width: 12px; height: 12px; } .g-dot svg path { fill: currentColor; stroke: none; }
+
+  /* 設定精靈（首啟；--wizard 可強制）：同一套規矩 */
+  .wiz { position: absolute; inset: 0; z-index: 12; background: var(--material); padding: 12px 28px 20px; display: flex; flex-direction: column; }
+  .wtop { flex: 0 0 28px; display: flex; align-items: flex-start; justify-content: space-between; }
+  .wpage { display: none; flex: 1 1 auto; min-height: 0; flex-direction: column; padding-top: 40px; }
+  .wpage.on { display: flex; }
+  .wpage .t-display { white-space: normal; }
+  .wpage > .t-body { margin-top: 12px; max-width: 330px; }
+  .wcard { margin-top: 20px; min-height: 64px; padding: 12px 12px 12px 20px; border-radius: 24px; box-shadow: var(--deboss); display: flex; align-items: center; gap: 12px; }
+  .wcard .path { flex: 1 1 auto; min-width: 0; font-family: var(--mono); font-size: 11px; line-height: 16px; color: var(--ink); direction: rtl; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wcard.rows { flex-direction: column; align-items: stretch; gap: 4px; padding: 16px 20px; }
+  .wcard.rows .r { display: flex; gap: 12px; } .wcard.rows .r .t-cap { flex: 0 0 64px; } .wcard.rows .r .t-body { flex: 1 1 auto; min-width: 0; color: var(--ink); }
+  .wtodo { margin-top: 20px; list-style: none; counter-reset: n; }
+  .wtodo li { counter-increment: n; position: relative; padding-left: 28px; font-size: 13px; line-height: 20px; color: var(--ink); margin-bottom: 16px; }
+  .wtodo li::before { content: counter(n); position: absolute; left: 0; top: 0; width: 16px; text-align: right; color: var(--ink-mid); }
+  .wtodo li .kb { margin-top: 8px; display: flex; }
+  .wrow { margin-top: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .wnav { flex: 0 0 auto; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+  .wnav .l { justify-self: start; } .wnav .r { justify-self: end; display: flex; align-items: center; gap: 20px; }
+  /* 精靈第一頁的使用規範：勾了「我了解」才能繼續 */
+  .terms { margin-top: 20px; padding: 16px 20px; border-radius: 24px; box-shadow: var(--deboss); }
+  .terms li { list-style: none; position: relative; padding-left: 16px; font-size: 13px; line-height: 20px; color: var(--ink); margin-bottom: 4px; }
+  .terms li::before { content: ""; position: absolute; left: 2px; top: 8px; width: 4px; height: 4px; border-radius: 50%; background: var(--ink-mid); }
+  .agree { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
+  .agree .box { flex: 0 0 24px; height: 24px; border-radius: 8px; box-shadow: var(--raise-sm); display: grid; place-items: center; }
+  .agree .box svg { width: 14px; height: 14px; opacity: 0; } .agree .box svg * { stroke-width: 3; }
+  .agree.on .box { box-shadow: var(--checked); } .agree.on .box svg { opacity: 1; }
+</style>
+
+<div class="app">
+  <header class="top"><svg class="w" viewBox="0 -170 438.8 240" role="img" aria-label="Fully"><path d="M26.8,-100h40v100h-40ZM26.8,-100A70,70 0 0 1 96.8,-170L96.8,-130A30,30 0 0 0 66.8,-100ZM96.8,-170h20v40h-20ZM0,-100h96.8v40h-96.8ZM106.8,-100h40v30h-40ZM106.8,-70A70,70 0 0 0 176.8,0L176.8,-40A30,30 0 0 1 146.8,-70ZM176.8,-100h40v100h-40ZM226.8,-170h40v170h-40ZM278.8,-170h40v170h-40ZM328.8,-100h40v30h-40ZM328.8,-70A70,70 0 0 0 398.8,0L398.8,-40A30,30 0 0 1 368.8,-70ZM398.8,-100h40v100h-40ZM438.8,0A70,70 0 0 1 368.8,70L368.8,30A30,30 0 0 0 398.8,0ZM348.8,30h20v40h-20Z"/></svg></header>
+
+  <section class="what slot" id="what">
+    <textarea id="url" rows="1" spellcheck="false" placeholder="網址會出現在這裡" data-i18n-ph="網址會出現在這裡"></textarea>
+    <button class="cap-key" id="pasteBtn"><svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/></svg><span data-i18n>貼上</span></button>
+    <span class="tile" id="cardIcon"><img id="cardImg" alt="" draggable="false"></span>
+    <div class="txt"><div class="t-title one" id="cardTitle"></div><div class="t-cap one" id="cardUrl"></div></div>
+    <button class="x" id="clearBtn" aria-label="清掉這個網址"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </section>
+
+  <div class="stagebox">
+    <span class="ring"></span><span class="ring"></span><span class="ring"></span><span class="ring"></span>
+    <button class="core" id="orbBtn" aria-label="下載">
+      <span class="mount"></span><span class="arc" id="arc"></span><span class="head" id="head"></span>
+      <span class="face">
+        <svg class="g-dl" viewBox="0 0 24 24"><path d="M12 4.5V14"/><path d="M7.8 10.4 12 14.6l4.2-4.2"/><path d="M6 19h12"/></svg>
+        <svg class="g-ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+        <svg class="g-re" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.7L21 8"/><path d="M21 3v5h-5"/></svg>
+        <span class="sq"></span>
+      </span>
+    </button>
+    <div class="olabel" id="orbLabel">下載</div>
+  </div>
+
+  <section class="zone" id="zone">
+    <div class="t-display" id="state"></div>
+    <div class="t-body one hide" id="nameLine"></div>
+    <div class="t-body" id="sub"></div>
+    <button class="link hide" id="pickLink"></button>
+    <div class="proof hide" id="proof"><svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg><b id="proofDims"></b><span id="proofX"></span></div>
+    <div class="t-cap tipline hide" id="tipline"></div>
+    <div class="t-body" id="note"></div>
+    <div class="fails hide" id="fails"></div>
+    <div class="acts hide" id="acts">
+      <button class="cap-key lg" id="openBtn"><span data-i18n>打開看看</span></button>
+      <button class="link" id="revealBtn" data-i18n>在 Finder 顯示</button>
+      <button class="link hide" id="followBtn"></button>
+    </div>
+    <div class="acts hide" id="errActs"></div>
+  </section>
+
+  <footer class="foot">
+    <button class="l" id="recentBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-i18n>最近抓的</span></button>
+    <span class="pb">Powered by <img src="brand/intention_wordmark.png" alt="INTENTION"></span>
+    <button class="r" id="settingsBtn"><span data-i18n>設定</span><svg viewBox="0 0 24 24"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.6"/><circle cx="8" cy="17" r="2.6"/></svg></button>
+  </footer>
+</div>
+
+<div class="toast t-cap" id="toast"></div>
+
+<div class="page" id="pRecent">
+  <div class="hd"><span class="tabs"><button id="tabRecent" class="on" data-i18n>最近抓的</button><button id="tabFollow"></button></span><button class="cap-key" data-close><span data-i18n>好</span></button></div>
+  <div class="bd">
+    <div id="recentPane"><div id="histList"></div>
+      <div class="row split"><button class="link" id="openDestBtn" data-i18n>打開存放的資料夾</button><button class="link" id="histClear" data-i18n>清除這份紀錄</button></div></div>
+    <div id="followPane" class="hide"><div id="followList"></div>
+      <div class="row split"><span class="t-cap" id="followNote" data-i18n>每 6 小時回去看一次，只抓新的。</span><button class="link" id="followCheck" data-i18n>現在檢查</button></div></div>
+  </div>
+</div>
+
+<div class="page" id="pSettings">
+  <div class="hd"><span class="t-display" data-i18n>設定</span><button class="cap-key" data-close><span data-i18n>好</span></button></div>
+  <div class="bd">
+    <div class="row"><div class="l"><div class="t-body" data-i18n>存到哪裡</div><div class="t-cap one" id="dest">—</div></div><button class="cap-key sm" id="pick"><span data-i18n>更改</span></button></div>
+    <div class="row col"><div class="l"><div class="t-body" data-i18n>複製網址時</div><div class="t-cap" data-i18n>問我＝右上角跳一張預覽卡，點一下才抓；它只先看一眼網頁，不會自己下載。</div></div>
+      <span class="seg" id="clipSeg"><button data-clip="card" data-i18n>問我</button><button data-clip="auto" data-i18n>直接抓</button><button data-clip="off" data-i18n>不動</button></span></div>
+    <button class="row" id="copyRow"><div class="l"><div class="t-body" data-i18n>單張圖抓完放進剪貼簿</div><div class="t-cap" data-i18n>⌘V 就能貼進 Figma、Keynote</div></div><span class="sw" id="copySw"><i></i></span></button>
+    <button class="row" id="dedupRow"><div class="l"><div class="t-body" data-i18n>同一張不存兩次</div><div class="t-cap" data-i18n>比對存放資料夾裡已經有的圖</div></div><span class="sw" id="dedupSw"><i></i></span></button>
+    <div class="row col"><div class="l"><div class="t-body" data-i18n>從瀏覽器一鍵送進 Fully</div><div class="t-cap" data-i18n>把這顆拖到書籤列。在任何網頁按一下，就交給 Fully。</div></div>
+      <span class="wrow" style="margin-top:0"><a class="bm" id="bookmarklet" href="#" draggable="true"><svg viewBox="0 0 10 10"><path d="M7 0h3v10H7ZM0 7h10v3H0ZM4 7L7 7A7 7 0 0 0 0 0L0 3A4 4 0 0 1 4 7Z"/></svg><span data-i18n>抓進 Fully</span></a><button class="link" id="bmCopy" data-i18n>拷貝這段</button></span></div>
+    <div class="row"><div class="l"><div class="t-body" data-i18n>外觀</div></div><span class="seg" id="seg"><button data-theme="system" data-i18n>跟系統</button><button data-theme="light" data-i18n>淺色</button><button data-theme="dark" data-i18n>深色</button></span></div>
+    <div class="row"><div class="l"><div class="t-body" data-i18n>語言</div></div><span class="seg" id="langSeg"><button data-lang="system" data-i18n>跟系統</button><button data-lang="zh">中文</button><button data-lang="en">English</button></span></div>
+    <div class="row col"><div class="l"><div class="t-body" data-i18n>叫出 Fully</div><div class="t-cap" data-i18n>在任何地方同時按這四個鍵</div></div><span class="kb" data-keys="control option command V"></span></div>
+    <button class="row" id="sitesBtn"><div class="l"><div class="t-body" data-i18n>Fully 能做什麼</div></div><span class="go"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span></button>
+    <div class="row col"><div class="l"><div class="t-body" data-i18n>關於 Fully</div><div class="t-cap one" id="aboutLine">—</div></div>
+      <span class="wrow" style="margin-top:0"><button class="link" id="docTerms" data-i18n>使用規範</button><button class="link" id="docPrivacy" data-i18n>隱私與權限</button></span></div>
+  </div>
+</div>
+
+<div class="page" id="pSites">
+  <div class="hd"><span class="t-display" data-i18n>Fully 能做什麼</span><button class="cap-key" data-close><span data-i18n>好</span></button></div>
+  <div class="bd sites" id="sitesBody">
+    <div class="t-body" data-i18n>貼上網址就好，Fully 會自己判斷。</div>
+    <div class="t-body" data-i18n><b>任何網頁</b><br>掃出頁面上公開看得到的圖，<br>一張張換成原始尺寸，同時下載。</div>
+    <div class="t-body" data-i18n><b>存下來之前</b><br>複製網址，右上角先跳一張預覽卡：<br>有幾張、能拿到多大、之前抓過沒。<br>只要其中幾張？按「挑幾張」。</div>
+    <div class="t-body" data-i18n><b>存下來之後</b><br>告訴你拿到多大、是頁面上那張的幾倍。<br>單張圖直接在剪貼簿，⌘V 就貼。<br>一模一樣的圖不會存第二份。</div>
+    <div class="t-body" data-i18n><b>順手</b><br>一次貼很多行會排隊抓；失敗的可以一次重試。<br>關掉再打開，沒抓完的會接著抓。<br>追蹤一個網頁，之後只抓新的。<br>右鍵選單「服務 → 用 Fully 抓」也可以。</div>
+  </div>
+</div>
+
+<div class="page" id="pPick">
+  <div class="hd"><span class="t-display" id="pickTitle"></span><button class="cap-key" data-close><span data-i18n>取消</span></button></div>
+  <div class="bd"><div class="t-cap" id="pickNote"></div><div class="grid" id="pickGrid"></div></div>
+  <div class="ft"><span class="wrow" style="margin-top:0"><button class="link" id="pickAll" data-i18n>全選</button><button class="link" id="pickNone" data-i18n>全不選</button></span><button class="cap-key lg" id="pickGo"></button></div>
+</div>
+
+<div class="page" id="pDoc">
+  <div class="hd"><span class="t-display" id="docTitle"></span><button class="cap-key" data-close><span data-i18n>好</span></button></div>
+  <div class="bd doc" id="docBody"></div>
+</div>
+
+<!-- 設定精靈 -->
+<div class="wiz hide" id="wiz">
+  <div class="wtop"><span class="t-cap" id="wstep"></span><svg class="w" viewBox="0 -170 438.8 240" role="img" aria-label="Fully"><path d="M26.8,-100h40v100h-40ZM26.8,-100A70,70 0 0 1 96.8,-170L96.8,-130A30,30 0 0 0 66.8,-100ZM96.8,-170h20v40h-20ZM0,-100h96.8v40h-96.8ZM106.8,-100h40v30h-40ZM106.8,-70A70,70 0 0 0 176.8,0L176.8,-40A30,30 0 0 1 146.8,-70ZM176.8,-100h40v100h-40ZM226.8,-170h40v170h-40ZM278.8,-170h40v170h-40ZM328.8,-100h40v30h-40ZM328.8,-70A70,70 0 0 0 398.8,0L398.8,-40A30,30 0 0 1 368.8,-70ZM398.8,-100h40v100h-40ZM438.8,0A70,70 0 0 1 368.8,70L368.8,30A30,30 0 0 0 398.8,0ZM348.8,30h20v40h-20Z"/></svg></div>
+  <div class="wpage" data-p="welcome">
+    <div class="t-display">Paste the link.<br>Get it fully.</div>
+    <div class="t-body" data-i18n>Fully 抓的是完整版，不是頁面上的縮圖。<br>網頁上的圖片，一張張換成原始尺寸。<br>三步設定，一分鐘。</div>
+    <ul class="terms" id="termsList">
+      <li data-i18n>只存你有權使用的圖片</li>
+      <li data-i18n>Fully 只存公開看得到的圖</li>
+      <li data-i18n>Fully 不上傳你的檔案</li>
+    </ul>
+    <div class="agree" id="agree"><button class="box" id="agreeBox" aria-label="我了解"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></button>
+      <span class="t-body" style="color:var(--ink)" data-i18n>我了解</span><button class="link" id="wTerms" data-i18n>看使用規範</button></div>
+  </div>
+  <div class="wpage" data-p="dest">
+    <div class="t-display" data-i18n>存到哪</div>
+    <div class="t-body" data-i18n>抓下來的東西會照來源自動開子資料夾，<br>不會散在桌面。之後在「設定」隨時可以改。</div>
+    <div class="wcard"><span class="path" id="wdest">—</span><button class="cap-key sm" id="wpick"><span data-i18n>更改</span></button></div>
+  </div>
+  <div class="wpage" data-p="call">
+    <div class="t-display" data-i18n>怎麼叫出來</div>
+    <div class="t-body" data-i18n>視窗收起來以後，這幾個地方都找得到它。</div>
+    <ol class="wtodo">
+      <li><span data-i18n>在任何地方同時按這四個鍵</span><span class="kb" data-keys="control option command V"></span></li>
+      <li><span data-i18n>或點 Dock 上的 Fully</span> <span class="g-dock"><i></i></span><span data-i18n>、選單列的小圖示</span> <span class="g-dot"><svg viewBox="0 0 10 10"><path d="M7 0h3v10H7ZM0 7h10v3H0ZM4 7L7 7A7 7 0 0 0 0 0L0 3A4 4 0 0 1 4 7Z"/></svg></span></li>
+      <li data-i18n>複製一個網址，右上角會跳出預覽卡，<br>點「抓下來」就開始。</li>
+    </ol>
+    <div class="wrow"><span class="t-body" style="color:var(--ink)" data-i18n>複製網址時</span><span class="seg" id="wclipSeg"><button data-clip="card" data-i18n>問我</button><button data-clip="auto" data-i18n>直接抓</button><button data-clip="off" data-i18n>不動</button></span></div>
+  </div>
+  <div class="wnav">
+    <button class="link l" id="wback" data-i18n>上一步</button>
+    <span class="pb" id="wpb">Powered by <img src="brand/intention_wordmark.png" alt="INTENTION"></span>
+    <span class="r"><button class="link" id="wskip" data-i18n>先跳過</button><button class="cap-key lg" id="wnext"></button></span>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const send = (action, payload = {}) => window.webkit?.messageHandlers?.app?.postMessage({ action, ...payload });
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  // ── 中文／English：元素用 data-i18n 整塊換（原文＝中文），JS 裡的句子走 tr('中文 {變數}', {變數}) ──
+  let LANG = 'zh';
+  const EN = {
+    '網址會出現在這裡': 'Your link shows up here', '貼上': 'Paste', '打開看看': 'Open', '在 Finder 顯示': 'Show in Finder',
+    '最近抓的': 'Recent', '設定': 'Settings', '好': 'Done', '取消': 'Cancel', '打開存放的資料夾': 'Open the save folder', '清除這份紀錄': 'Clear this list',
+    '每 6 小時回去看一次，只抓新的。': 'Checked every 6 hours — only new things are grabbed.', '現在檢查': 'Check now',
+    '存到哪裡': 'Save to', '更改': 'Change', '複製網址時': 'When I copy a link',
+    '問我＝右上角跳一張預覽卡，點一下才抓；它只先看一眼網頁，不會自己下載。': 'Ask = a preview card pops up top-right; nothing downloads until you click. It only takes a quick look at the page first.',
+    '問我': 'Ask me', '直接抓': 'Grab right away', '不動': 'Do nothing',
+    '單張圖抓完放進剪貼簿': 'Put single images on the clipboard', '⌘V 就能貼進 Figma、Keynote': 'So ⌘V pastes the original into Figma or Keynote',
+    '同一張不存兩次': "Don't save the same image twice", '比對存放資料夾裡已經有的圖': 'Compares with images already in your save folder',
+    '從瀏覽器一鍵送進 Fully': 'Send pages from your browser', '把這顆拖到書籤列。在任何網頁按一下，就交給 Fully。': 'Drag this to your bookmarks bar. Click it on any page to hand the page to Fully.',
+    '抓進 Fully': 'Grab with Fully', '拷貝這段': 'Copy the code', '外觀': 'Appearance', '跟系統': 'System', '淺色': 'Light', '深色': 'Dark', '語言': 'Language',
+    '叫出 Fully': 'Bring up Fully', '在任何地方同時按這四個鍵': 'Press these four keys together, anywhere', 'Fully 能做什麼': 'What Fully does', '關於 Fully': 'About Fully',
+    '使用規範': 'Terms of use', '隱私與權限': 'Privacy & permissions',
+    '貼上網址就好，Fully 會自己判斷。': 'Just paste a link — Fully figures out the rest.',
+    '<b>任何網頁</b><br>掃出頁面上公開看得到的圖，<br>一張張換成原始尺寸，同時下載。': '<b>Any web page</b><br>Finds the publicly visible images on the page<br>and saves each one at its original size, several at a time.',
+    '<b>存下來之前</b><br>複製網址，右上角先跳一張預覽卡：<br>有幾張、能拿到多大、之前抓過沒。<br>只要其中幾張？按「挑幾張」。': '<b>Before saving</b><br>Copy a link and a preview card pops up:<br>how many images, how big they get, whether you saved it before.<br>Only want a few? Tap “Pick some”.',
+    '<b>存下來之後</b><br>告訴你拿到多大、是頁面上那張的幾倍。<br>單張圖直接在剪貼簿，⌘V 就貼。<br>一模一樣的圖不會存第二份。': '<b>After saving</b><br>Shows how big each file is — and how many times bigger than the one on the page.<br>A single image lands on your clipboard, ready for ⌘V.<br>Exact duplicates are never saved twice.',
+    '<b>順手</b><br>一次貼很多行會排隊抓；失敗的可以一次重試。<br>關掉再打開，沒抓完的會接著抓。<br>追蹤一個網頁，之後只抓新的。<br>右鍵選單「服務 → 用 Fully 抓」也可以。': '<b>Also</b><br>Paste many lines and they queue up; retry all the failed ones at once.<br>Quit and reopen — unfinished ones pick up where they left off.<br>Follow a page and Fully grabs only what’s new.<br>Right-click → Services → “Grab with Fully” works too.',
+    '全選': 'Select all', '全不選': 'Select none',
+    'Fully 抓的是完整版，不是頁面上的縮圖。<br>網頁上的圖片，一張張換成原始尺寸。<br>三步設定，一分鐘。': 'Fully saves the full version, not the thumbnail you see.<br>Images on a page, each at its original size.<br>Three quick steps, one minute.',
+    '只存你有權使用的圖片': 'Only save images you have the right to use', 'Fully 只存公開看得到的圖': 'Fully only saves publicly visible images', 'Fully 不上傳你的檔案': "Fully doesn't upload your files",
+    '我了解': 'I understand', '看使用規範': 'Read the terms', '存到哪': 'Where to save',
+    '抓下來的東西會照來源自動開子資料夾，<br>不會散在桌面。之後在「設定」隨時可以改。': 'Everything goes into a subfolder named after its source —<br>nothing scattered on your desktop. Change it anytime in Settings.',
+    '怎麼叫出來': 'How to bring it up', '視窗收起來以後，這幾個地方都找得到它。': 'Once the window is tucked away, you can find it here:',
+    '或點 Dock 上的 Fully': 'Or click Fully in the Dock', '、選單列的小圖示': ' or the menu bar icon',
+    '複製一個網址，右上角會跳出預覽卡，<br>點「抓下來」就開始。': 'Copy a link and a preview card pops up top-right —<br>click “Grab” to start.',
+    '上一步': 'Back', '先跳過': 'Skip',
+    // 動態的句子
+    '下載': 'Grab', '再試一次': 'Try again', '停止': 'Stop', '清掉這個網址': 'Clear this link',
+    '開始設定': 'Get started', '好了，開始用': 'Done — start using Fully', '下一步': 'Next',
+    '先複製一個網址': 'Copy a link first',
+    '在任何網頁複製網址，右上角會跳出預覽卡；<br>或回到這裡，網址會自己出現。': 'Copy a link on any page and a preview card pops up top-right;<br>or come back here — the link shows up on its own.',
+    '直接抓開著：在任何地方複製網址，<br>Fully 會自己開始抓。': 'Grab-right-away is on: copy a link anywhere<br>and Fully starts on its own.',
+    '到任何網頁把網址複製起來，<br>再回到這裡，它會自己出現。': 'Copy a link on any page,<br>then come back here — it shows up on its own.',
+    '可以下載了': 'Ready', '按中間那顆開始。<br>抓的是原始大圖，不是頁面上的縮圖。': 'Press the middle button.<br>You get the original, not the thumbnail on the page.',
+    '網頁': 'Web page', '{src}・共 {n} 個網址': '{src} · {n} links', '正在看這是什麼…': 'Taking a look…',
+    '讀取中': 'Reading', '第 {a}／{b} 個。': '{a} of {b}. ', '可以先去忙，好了會通知你。': 'Go do something else — you’ll get a notification.',
+    '下載中': 'Downloading',
+    '不到 1 分鐘': 'under a minute', '大約還要 {n} 分鐘': 'about {n} min left', '，': ', ',
+    '{a}／{b} 張': '{a} / {b}', '{n} 張': '{n}', '邊讀邊抓，抓的是原始尺寸。': 'Saving as it reads — at original size.',
+    '存好了': 'Saved', '之前就抓過了': 'Already saved', '早就有了': 'Already saved', '沒有夠大的圖': 'No big images', '這次沒抓到': 'Nothing came through',
+    '這一頁的圖都太小（像圖示、按鈕），沒有存。': 'Everything on this page was tiny (icons, buttons) — nothing saved.',
+    '{n} {u}，放在「{w}」。': '{n} {u} in “{w}”.', '放在「{w}」。': 'In “{w}”.', '全部 {n} {u}都已經在「{w}」裡。': 'All {n} {u} are already in “{w}”.',
+    '另外 {n} {u}略過（抓過或太小）': '{n} {u} skipped (already there or too small)', '{n} {u}抓不到': "{n} {u} couldn't be grabbed",
+    '另外存了{x}。': 'Also saved {x}.',
+    '{n} 張跟之前抓的一模一樣，沒再存一份': "{n} were identical to ones you already have — not saved again",
+    '其中 {n} 張跟之前抓的一模一樣': "{n} are identical to ones you already have",
+    '張': 'images',
+    '最大 {d}': 'Up to {d}', '頁面上那張的 {r} 倍': '{r}× the one on the page',
+    '原圖已在剪貼簿，⌘V 就能貼。': 'The original is on your clipboard — ⌘V to paste.',
+    '追蹤，之後只抓新的': 'Follow for new', '追蹤中 ✓': 'Following ✓',
+    '{n} 個存好了': '{n} saved', '都抓不到': "Couldn't grab any", '{n} 個都存好了': 'All {n} saved', '{n} 個抓不到：': "{n} couldn't be grabbed:", '全部重試': 'Retry all',
+    '已停止': 'Stopped', '這個抓不到': "Couldn't grab this",
+    '剪貼簿裡沒有網址。先到網頁上把網址複製起來。': "There's no link on the clipboard. Copy one from a web page first.",
+    '挑幾張': 'Pick some', '挑要的': 'Pick', '正在列出每一張…': 'Listing everything…', '抓這 {n} 張': 'Grab {n}', '已選 {a}／{b}': '{a} of {b} selected', '（只列出前 {n} 張）': '(showing the first {n})',
+    '列不出來，直接按下載抓全部。': "Couldn't list them — press Grab to get everything.",
+    '還沒有抓過東西。': 'Nothing yet.', '還沒有追蹤任何來源。<br>抓完一整批時，<br>完成畫面會有「追蹤」。': "You're not following anything yet.<br>After grabbing a whole batch,<br>the done screen offers “Follow”.",
+    '追蹤中': 'Following', '追蹤中（{n}）': 'Following ({n})', '上次 {w}': 'checked {w}', '新 {n}': '{n} new', '還沒檢查': 'not checked yet', '正在檢查…': 'Checking…',
+    '停止追蹤': 'Unfollow', '開源': 'open source',
+    '{n} 張・原圖最大 {w} × {h}': '{n} images · originals up to {w} × {h}', '{n} 張': '{n} images', '原圖最大 {w} × {h}': 'originals up to {w} × {h}',
+    '抓過了 {d}': 'saved {d}', '可以抓下來': 'Ready to grab',
+    '這一頁沒找到圖': 'No images found on this page',
+    '這個網頁不是公開的。Fully 只存公開看得到的圖。': "This page isn't public. Fully only saves images that are publicly visible.",
+    '拖出去就是檔案': 'Drag it out — it’s the file',
+  };
+  const tr = (s, v) => { let o = (LANG === 'en' && EN[s] !== undefined) ? EN[s] : s;
+    if (v) o = o.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? ''); return o; };
+  function translate() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      if (el.dataset.zh === undefined) el.dataset.zh = el.innerHTML.trim();
+      el.innerHTML = tr(el.dataset.zh);
+    });
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
+    document.documentElement.lang = LANG === 'en' ? 'en' : 'zh-Hant';
+  }
+
+  const ICON = {
+    img: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>',
+    go:  '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>',
+    x:   '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+    ok:  '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
+    eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  };
+
+  let iconFor = k => ICON.img;                          // 網址卡的小圖示
+  let histIconFor = it => ICON.img;                     // 最近抓的每一列的小圖示
+
+  let mode = 'idle';                 // idle／run／done／err
+  let kind = 'none', srcLabel = '', total = 0, evKind = '', curName = '';
+  let qState = { pending: [], done: 0, total: 0, active: false };
+  let lastFile = null, lastSheet = null, lastFolder = null, lastStarted = '', history = [], prefs = { clip: 'card' };
+  let t0 = 0, f0 = 0, lastEta = '', runUrl = '', preview = null, previewFor = '', pickIds = null, lastDoneEv = null, follows = [];
+
+  const urlsNow = () => $('url').value.split(/[\n\s,]+/).filter(u => /^https?:\/\//.test(u));
+  const resolving = on => document.body.classList.toggle('resolving', on);
+  const prog = f => { if (!isFinite(f)) return; const p = Math.max(0, Math.min(1, f)) * 100; $('arc').style.setProperty('--p', p); $('head').style.setProperty('--p', p); };
+  const setText = (big, sub) => { if (big !== undefined) $('state').innerHTML = big; if (sub !== undefined) $('sub').innerHTML = sub; };
+  const note = t => { $('note').innerHTML = t || ''; };
+  let toastT = 0;
+  const toast = t => { $('toast').textContent = t; $('toast').classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => $('toast').classList.remove('on'), 4000); };
+  let withMode = (d, k) => d;                           // 開抓時帶給 Swift 的參數
+
+  // ── 來源判斷：網址卡上寫網域 ──
+  const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
+  const shortUrl = u => u.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+
+  function classify() {
+    const urls = urlsNow();
+    if (!urls.length) { kind = 'none'; srcLabel = ''; return; }
+    srcLabel = hostOf(urls[0]) || tr('網頁'); kind = 'image';
+  }
+
+  // ── 預覽：網址一帶進來就請 Swift 看一眼（引擎 --probe），回來填進網址卡 ──
+  let probeT = 0;
+  function askPreview() {
+    clearTimeout(probeT);
+    const urls = urlsNow();
+    if (urls.length !== 1 || mode === 'run') return;
+    if (previewFor === urls[0]) return;
+    previewFor = urls[0]; preview = null; pickIds = null;
+    probeT = setTimeout(() => send('probe', { url: urls[0] }), 250);
+  }
+  function metaLine(p) {
+    const bits = [];
+    const n = p.count || 0;
+    if (n > 1) bits.push(tr('{n} 張', { n }));
+    if (p.w && p.h) bits.push(tr('原圖最大 {w} × {h}', { w: p.w, h: p.h }));
+    if (p.failed || (!bits.length && p.count === 0 && !p.name)) return p.count === 0 && !p.failed ? tr('這一頁沒找到圖') : shortUrl(p.url || '');
+    return bits.join('・') || tr('可以抓下來');
+  }
+  function paintCardPreview() {
+    const urls = urlsNow();
+    const p = preview && urls.length === 1 && preview.url === urls[0] ? preview : null;
+    const tile = $('cardIcon'), img = $('cardImg');
+    if (!p) { tile.classList.remove('pic'); img.classList.remove('on'); img.removeAttribute('src'); return; }
+    if (p.name) $('cardTitle').textContent = p.name;
+    $('cardUrl').textContent = metaLine(p) + (p.seen ? '・' + tr('抓過了 {d}', { d: p.seen }) : ''); $('cardUrl').classList.remove('url');
+    if (p.thumb && /^https?:/.test(p.thumb)) {
+      tile.classList.add('pic');
+      if (img.getAttribute('src') !== p.thumb) { img.classList.remove('on'); img.onload = () => img.classList.add('on'); img.onerror = () => tile.classList.remove('pic'); img.src = p.thumb; }
+    }
+    const multi = !!p.multi && (p.count || 0) > 1;
+    $('pickLink').textContent = tr('挑幾張');
+    $('pickLink').classList.toggle('hide', !(multi && mode === 'idle'));
+  }
+
+  // ── 畫面＝(mode, 有沒有網址, 來源種類) 的函數；所有顯示切換只走這裡 ──
+  function paint() {
+    const urls = urlsNow(), has = urls.length > 0;
+    let view = mode !== 'idle' ? mode : (!has ? 'empty' : 'image');
+    document.body.dataset.state = mode; document.body.dataset.v = view;
+    const showCard = has || mode === 'run' || mode === 'done';
+    $('what').className = 'what ' + (showCard ? 'card' : 'slot');
+    if (showCard && mode === 'idle') {
+      $('cardIcon').firstChild && $('cardIcon').querySelectorAll('svg').forEach(s => s.remove());
+      $('cardIcon').insertAdjacentHTML('afterbegin', iconFor(kind));
+      $('cardTitle').textContent = urls.length > 1 ? tr('{src}・共 {n} 個網址', { src: srcLabel, n: urls.length }) : srcLabel;
+      $('cardUrl').textContent = shortUrl(urls[0] || ''); $('cardUrl').classList.add('url');
+      paintCardPreview();
+    }
+    const o = view === 'empty' ? 'off' : view === 'run' ? 'run' : view === 'done' ? 'done' : view === 'err' ? 'retry' : 'on';
+    document.body.dataset.o = o;
+    $('orbLabel').textContent = o === 'retry' ? tr('再試一次') : o === 'done' ? '' : tr('下載');
+    $('orbBtn').setAttribute('aria-label', o === 'run' ? tr('停止') : o === 'retry' ? tr('再試一次') : tr('下載'));
+    $('clearBtn').setAttribute('aria-label', tr('清掉這個網址'));
+    $('nameLine').classList.add('hide');           // 名稱在網址卡上，完成畫面不重複（高度留給「拿到多大」）
+    $('acts').classList.toggle('hide', view !== 'done');
+    $('proof').classList.toggle('hide', view !== 'done' || !$('proofDims').textContent);
+    $('tipline').classList.toggle('hide', view !== 'done' || !$('tipline').textContent);
+    $('note').classList.toggle('hide', view !== 'run');
+    $('errActs').classList.toggle('hide', view !== 'err' || !$('errActs').innerHTML);
+    if (mode !== 'idle' || !has) $('pickLink').classList.add('hide');
+    if (view !== 'done' && view !== 'err') $('fails').classList.add('hide');
+    if (view === 'empty') {
+      let s = null;
+      setText(tr('先複製一個網址'), s || (prefs.clip === 'card' ? tr('在任何網頁複製網址，右上角會跳出預覽卡；<br>或回到這裡，網址會自己出現。')
+        : prefs.clip === 'auto' ? tr('直接抓開著：在任何地方複製網址，<br>Fully 會自己開始抓。') : tr('到任何網頁把網址複製起來，<br>再回到這裡，它會自己出現。')));
+    }
+    if (view === 'image') setText(tr('可以下載了'), tr('按中間那顆開始。<br>抓的是原始大圖，不是頁面上的縮圖。'));
+  }
+  function onInput() { classify(); if (mode !== 'run') { mode = 'idle'; resolving(false); } paint(); askPreview(); }
+  $('url').addEventListener('input', onInput);
+
+  // 還要多久：從下載開始的速度推；太早或快結束都不報
+  function eta(frac) {
+    const now = performance.now();
+    if (!t0 || frac < f0) { t0 = now; f0 = frac; lastEta = ''; return ''; }
+    const el = (now - t0) / 1000, df = frac - f0;
+    if (el < 4 || df < .03 || frac > .97) return lastEta;
+    const left = el / df * (1 - frac);
+    return lastEta = left < 50 ? tr('不到 1 分鐘') : tr('大約還要 {n} 分鐘', { n: Math.ceil(left / 60) });
+  }
+  const qLine = () => qState.total > 1 ? tr('第 {a}／{b} 個。', { a: Math.min(qState.done + 1, qState.total), b: qState.total }) : '';
+  const running = (what, frac) => { const e = eta(frac); $('sub').innerHTML = `${qLine()}${what}${e ? tr('，') + e : ''}${LANG === 'en' ? '.' : '。'}`; };
+  const folderName = p => (p || '').split('/').filter(Boolean).pop() || '';
+
+  // ── 最近抓的／追蹤中 ──
+  function renderHistory() {
+    $('histList').innerHTML = history.length ? history.slice(0, 8).map((it, i) =>
+      `<button class="row" data-i="${i}"><span class="tile" data-drag="${esc(it.file || it.folder || '')}">${histIconFor(it)}<img alt="" draggable="false"></span><div class="l"><div class="t-body one">${esc(it.name || it.url || '')}</div><div class="t-cap one">${esc([it.kind, it.when, it.dims].filter(Boolean).join('・'))}</div></div><span class="go">${ICON.go}</span></button>`).join('')
+      : `<div class="row"><span class="t-body">${tr('還沒有抓過東西。')}</span></div>`;
+    $('histList').querySelectorAll('button').forEach(b => b.onclick = () => send('histReveal', { i: +b.dataset.i }));
+    $('histList').querySelectorAll('[data-drag]').forEach(t => { if (t.dataset.drag) { t.classList.add('drag'); t.onmousedown = () => send('dragArm', { files: [t.dataset.drag] }); } });
+    $('histClear').classList.toggle('hide', !history.length);
+    if (history.length && $('pRecent').classList.contains('on')) send('histThumbs');
+  }
+  function renderFollows(checking) {
+    $('tabFollow').textContent = follows.length ? tr('追蹤中（{n}）', { n: follows.length }) : tr('追蹤中');
+    $('followList').innerHTML = follows.length ? follows.map(f =>
+      `<div class="row"><span class="tile">${ICON.eye}</span><div class="l"><div class="t-body one">${esc(f.name)}</div><div class="t-cap one">${esc([f.lastCheck ? tr('上次 {w}', { w: f.lastCheck }) : tr('還沒檢查'), f.lastNew ? tr('新 {n}', { n: f.lastNew }) : '', f.error ? '⚠︎ ' + f.error : ''].filter(Boolean).join('・'))}</div></div><button class="x mini" data-id="${esc(f.id)}" aria-label="${tr('停止追蹤')}">${ICON.x}</button></div>`).join('')
+      : `<div class="row col"><span class="t-body">${tr('還沒有追蹤任何來源。<br>抓完一整批時，<br>完成畫面會有「追蹤」。')}</span></div>`;
+    $('followList').querySelectorAll('[data-id]').forEach(b => b.onclick = () => send('followRemove', { id: b.dataset.id }));
+    $('followCheck').textContent = checking ? tr('正在檢查…') : tr('現在檢查');
+    $('followCheck').disabled = !!checking || !follows.length;
+  }
+  const showTab = f => { $('tabRecent').classList.toggle('on', !f); $('tabFollow').classList.toggle('on', f); $('recentPane').classList.toggle('hide', f); $('followPane').classList.toggle('hide', !f); };
+  $('tabRecent').onclick = () => showTab(false);
+  $('tabFollow').onclick = () => showTab(true);
+
+  // ── 挑幾張 ──
+  let pickItems = [], pickSel = new Set();
+  function openPicker() {
+    const u = urlsNow()[0]; if (!u) return;
+    pickItems = []; pickSel = new Set();
+    $('pickTitle').textContent = tr('挑要的'); $('pickNote').textContent = tr('正在列出每一張…'); $('pickGrid').innerHTML = '';
+    paintPickFoot(); openPage('pPick');
+    send('probe', { url: u, items: true, manual: true });
+  }
+  function paintPickFoot() {
+    const n = pickSel.size;
+    $('pickGo').textContent = tr('抓這 {n} 張', { n }); $('pickGo').disabled = !n;
+    if (pickItems.length) $('pickNote').textContent = tr('已選 {a}／{b}', { a: n, b: pickItems.length });
+  }
+  function renderPicker(items) {
+    pickItems = items || []; pickSel = new Set(pickItems.map(i => String(i.id)));
+    if (!pickItems.length) { $('pickNote').textContent = tr('列不出來，直接按下載抓全部。'); return; }
+    $('pickGrid').innerHTML = pickItems.map(i => `<button class="cell on" data-id="${esc(i.id)}">${i.thumb ? `<img src="${esc(i.thumb)}" alt="" loading="lazy" draggable="false">` : `<span class="no">${esc(i.id)}</span>`}<span class="ck">${ICON.ok}</span>${i.title ? `<span class="cap">${esc(i.title)}</span>` : ''}</button>`).join('');
+    $('pickGrid').querySelectorAll('.cell').forEach(c => c.onclick = () => { const id = c.dataset.id; if (pickSel.has(id)) pickSel.delete(id); else pickSel.add(id); c.classList.toggle('on', pickSel.has(id)); paintPickFoot(); });
+    paintPickFoot();
+  }
+  $('pickAll').onclick = () => { pickSel = new Set(pickItems.map(i => String(i.id))); $('pickGrid').querySelectorAll('.cell').forEach(c => c.classList.add('on')); paintPickFoot(); };
+  $('pickNone').onclick = () => { pickSel = new Set(); $('pickGrid').querySelectorAll('.cell').forEach(c => c.classList.remove('on')); paintPickFoot(); };
+  $('pickGo').onclick = () => { const u = urlsNow()[0]; if (!u || !pickSel.size) return;
+    const ids = pickItems.map(i => String(i.id)).filter(id => pickSel.has(id));
+    openPage(''); send('start', withMode({ urls: [u], pick: ids.join(',') }, kind)); };
+  $('pickLink').onclick = openPicker;
+
+  // ── 文件頁：極簡 Markdown（標題、段落、清單、粗體、行內碼、連結、分隔線、表格）──
+  function md(src) {
+    const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
+    const out = []; let list = null, table = null;
+    const flush = () => { if (list) { out.push(`<${list.t}>${list.items.map(i => `<li>${inline(i)}</li>`).join('')}</${list.t}>`); list = null; }
+      if (table) { out.push('<table>' + table.map((r, i) => '<tr>' + r.map(c => i ? `<td>${inline(c)}</td>` : `<th>${inline(c)}</th>`).join('') + '</tr>').join('') + '</table>'); table = null; } };
+    for (const raw of src.split('\n')) {
+      const l = raw.trimEnd();
+      let m;
+      if (/^\|/.test(l)) { if (/^\|\s*-/.test(l)) continue; const cells = l.replace(/^\||\|$/g, '').split('|').map(c => c.trim()); if (list) flush(); (table = table || []).push(cells); continue; }
+      if (table) flush();
+      if ((m = l.match(/^(#{2,3})\s+(.*)/))) { flush(); out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); }
+      else if (/^---+$/.test(l)) { flush(); out.push('<hr>'); }
+      else if ((m = l.match(/^\s*[-*]\s+(.*)/))) { if (!list || list.t !== 'ul') { flush(); list = { t: 'ul', items: [] }; } list.items.push(m[1]); }
+      else if ((m = l.match(/^\s*\d+\.\s+(.*)/))) { if (!list || list.t !== 'ol') { flush(); list = { t: 'ol', items: [] }; } list.items.push(m[1]); }
+      else if (!l.trim()) flush();
+      else { flush(); out.push(`<p>${inline(l)}</p>`); }
+    }
+    flush();
+    return out.join('');
+  }
+
+  // ── Swift → JS ────────────────────────────────────────────────
+  window.appEvent = ev => {
+    switch (ev.type) {
+      case 'hello': {
+        LANG = ev.lang === 'en' ? 'en' : 'zh';
+        translate();
+        classify(); paint(); wizGo(wizIdx); renderHistory(); renderFollows(false);
+        break;
+      }
+      case 'dest':  $('dest').textContent = ev.path; $('wdest').textContent = ev.path; break;
+      case 'clip':  if (mode !== 'run' && (!$('url').value || mode === 'done' || mode === 'err') && ev.url !== lastStarted) { mode = 'idle'; $('url').value = ev.url; onInput(); } break;
+      case 'paste': if (mode !== 'run') { if (/https?:\/\//.test(ev.text || '')) { mode = 'idle'; $('url').value = ev.text; onInput(); } else { nudge(); toast(tr('剪貼簿裡沒有網址。先到網頁上把網址複製起來。')); } } break;
+      case 'focus': $('url').focus(); break;
+      case 'notice': if (mode === 'run') note(esc(ev.message)); else toast(ev.message); break;
+      case 'prefs': {
+        prefs = ev;
+        document.querySelectorAll('#clipSeg button, #wclipSeg button').forEach(b => b.classList.toggle('on', b.dataset.clip === ev.clip));
+        $('copySw').classList.toggle('on', !!ev.copyAfter); $('dedupSw').classList.toggle('on', !!ev.dedup);
+        document.querySelectorAll('#langSeg button').forEach(b => b.classList.toggle('on', b.dataset.lang === (ev.lang || 'system')));
+        if (ev.bookmarklet) $('bookmarklet').setAttribute('href', ev.bookmarklet);
+        if (mode === 'idle') paint();
+        break;
+      }
+      case 'history': history = ev.items || []; renderHistory(); break;
+      case 'histThumb': { const t = $('histList').querySelector(`[data-i="${ev.i}"] .tile`); if (t) { t.classList.add('pic'); const im = t.querySelector('img'); im.onload = () => im.classList.add('on'); im.src = ev.data; } break; }
+      case 'follows': follows = ev.items || []; renderFollows(ev.checking); break;
+      case 'about': $('aboutLine').textContent = `${ev.version || ''}（${ev.build || ''}）・${tr('開源')}`; break;
+      case 'extra': if (ev.sheet) lastSheet = ev.sheet; break;
+      case 'theme': {
+        const m = ev.mode || 'system';
+        if (m === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = m;
+        document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.theme === m));
+        break;
+      }
+      case 'wizard':
+        if (ev.show) {
+          $('wiz').classList.remove('hide'); agreed = !!ev.agreed; $('agree').classList.toggle('on', agreed); wizGo(ev.page || 0);
+        }
+        else { $('wiz').classList.add('hide'); $('url').focus(); }
+        break;
+      case 'queue':
+        qState = { pending: ev.pending || [], done: ev.done || 0, total: ev.total || 0, active: !!ev.active }; break;
+
+      case 'preview':
+        if (ev.url === urlsNow()[0]) { preview = ev; if (mode === 'idle') paintCardPreview(); }
+        break;
+      case 'items':
+        if ($('pPick').classList.contains('on')) renderPicker(ev.items || []);
+        break;
+      case 'doc':
+        $('docTitle').textContent = tr(ev.doc === 'privacy' ? '隱私與權限' : '使用規範');
+        $('docBody').innerHTML = md(ev.md || ''); $('docBody').scrollTop = 0;
+        openPage('pDoc', true);
+        break;
+
+      case 'started':
+        total = 0; evKind = ''; curName = ''; lastFile = null; lastSheet = null; lastFolder = null; t0 = 0; lastEta = ''; lastDoneEv = null;
+        runUrl = ev.url || urlsNow()[0] || ''; lastStarted = runUrl || lastStarted;
+        $('fails').innerHTML = ''; $('nameLine').textContent = ''; $('proofDims').textContent = ''; $('proofX').textContent = ''; $('tipline').textContent = ''; $('errActs').innerHTML = '';
+        mode = 'run'; paint(); prog(0); resolving(true);
+        setText(tr('讀取中'), qLine() + tr('正在看這是什麼…'));
+        note(tr('可以先去忙，好了會通知你。'));
+        break;
+      case 'source': {
+        total = ev.count || 0; evKind = ev.kind || ''; curName = ev.name || '';
+        resolving(false); prog(0); t0 = 0;
+        $('cardIcon').querySelectorAll('svg').forEach(s => s.remove());
+        $('cardIcon').insertAdjacentHTML('afterbegin', iconFor(evKind));
+        $('cardTitle').textContent = curName || ev.label || ''; $('cardUrl').textContent = ev.label || ''; $('cardUrl').classList.remove('url');
+        if (total > 0) { setText(tr('{a}／{b} 張', { a: 0, b: total })); running(tr('下載中'), 0); }
+        else { setText(tr('{n} 張', { n: 0 })); $('sub').innerHTML = tr('邊讀邊抓，抓的是原始尺寸。'); resolving(true); }
+        break;
+      }
+      case 'item':
+        if (total > 0) { setText(tr('{a}／{b} 張', { a: ev.index, b: total })); prog(ev.index / total); running(tr('下載中'), ev.index / total); }
+        else setText(tr('{n} 張', { n: ev.index }));
+        break;
+      case 'progress': {
+        let what = tr('下載中');
+        setText(`${ev.percent}%`); prog(ev.percent / 100); running(what, ev.percent / 100);
+        break;
+      }
+      case 'done': done(ev); break;
+      case 'thumb': {
+        const tile = $('cardIcon'), img = $('cardImg');
+        tile.classList.add('pic', 'drag'); img.onload = () => img.classList.add('on'); img.src = ev.data;
+        tile.title = tr('拖出去就是檔案');
+        break;
+      }
+      case 'copied': if (!/⌘V/.test($('sub').innerHTML)) $('sub').innerHTML += '<br>' + tr('原圖已在剪貼簿，⌘V 就能貼。'); paint(); break;
+      case 'batch': {
+        const failed = ev.failed || [];
+        mode = ev.ok ? 'done' : 'err'; $('nameLine').textContent = '';
+        setText(failed.length ? (ev.ok ? tr('{n} 個存好了', { n: ev.ok }) : tr('都抓不到')) : tr('{n} 個都存好了', { n: ev.total }), failed.length ? tr('{n} 個抓不到：', { n: failed.length }) : '');
+        $('fails').innerHTML = failed.slice(0, 2).map(f => `<div class="t-body one">${esc(f.name)}${f.msg ? '：' + esc(f.msg) : ''}</div>`).join('');
+        // 全部重試：有成功的＝放進完成那排按鍵（文字鍵）；全部失敗＝錯誤畫面的主鍵
+        $('acts').querySelector('#retryAll')?.remove();
+        $('errActs').innerHTML = failed.length && !ev.ok ? `<button class="cap-key" id="retryAll">${tr('全部重試')}</button>` : '';
+        if (failed.length && ev.ok) $('acts').insertAdjacentHTML('beforeend', `<button class="link" id="retryAll">${tr('全部重試')}</button>`);
+        $('followBtn').classList.add('hide'); $('proofDims').textContent = '';
+        paint(); $('fails').classList.toggle('hide', !failed.length);
+        if (failed.length) $('retryAll').onclick = () => send('retryAll');
+        break;
+      }
+      case 'error': {
+        resolving(false); mode = 'err'; prog(0);
+        if (!$('url').value && runUrl && qState.total <= 1) { $('url').value = runUrl; classify(); }   // 拖放／自動下載進來的，把網址放回去才能再試一次
+        setText(/^(已停止|Stopped)/.test(ev.message || '') ? tr('已停止') : tr('這個抓不到'), esc(ev.message));
+        $('errActs').innerHTML = '';
+        paint();
+        break;
+      }
+    }
+  };
+
+  function done(ev) {
+    resolving(false); mode = 'done'; prog(1); lastDoneEv = ev;
+    lastFile = ev.file || null; lastFolder = ev.folder || null; if (ev.sheet) lastSheet = ev.sheet;
+    $('url').value = ''; classify(); previewFor = '';             // 抓完清空，下一個網址才進得來
+    const n = ev.added || 0, sk = ev.skipped || 0, fl = ev.failed || 0, du = ev.dups || 0;
+    let u = tr('張'), extras = '';
+    const where = folderName(ev.folder);
+    $('nameLine').textContent = ev.headline || curName || '';
+    const sm = ev.small || 0, allSmall = !n && !du && sk > 0 && sm >= sk;   // 全部都是太小的（像圖示）：不是「之前抓過」
+    const allFail = !n && !du && !sk && fl > 0;                            // 一張都沒下載成功（main.swift doneHead 同一套）
+    const head = n ? tr('存好了') : (du ? tr('早就有了') : allSmall ? tr('沒有夠大的圖') : allFail ? tr('這次沒抓到') : tr('之前就抓過了'));
+    const lines = [];
+    if (n) lines.push(n === 1 ? tr('放在「{w}」。', { w: esc(where) }) : tr('{n} {u}，放在「{w}」。', { n, u, w: esc(where) }));
+    else if (allSmall) lines.push(tr('這一頁的圖都太小（像圖示、按鈕），沒有存。'));
+    else if (!du && !allFail) lines.push(tr('全部 {n} {u}都已經在「{w}」裡。', { n: sk, u, w: esc(where) }));
+    const minor = [sk && n ? tr('另外 {n} {u}略過（抓過或太小）', { n: sk, u }) : '', fl ? tr('{n} {u}抓不到', { n: fl, u }) : ''].filter(Boolean).join(tr('，'));
+    if (minor) lines.push(minor + (LANG === 'en' ? '.' : '。'));
+    if (du) lines.push(ev.dup_saved ? tr('其中 {n} 張跟之前抓的一模一樣', { n: du }) : tr('{n} 張跟之前抓的一模一樣，沒再存一份', { n: du }));
+    if (extras) lines.push(tr('另外存了{x}。', { x: extras }));
+    setText(head, lines.join('<br>'));
+    // 拿到多大（量的是存下來的檔）
+    if (ev.w && ev.h) {
+      $('proofDims').textContent = `${ev.w} × ${ev.h}`;
+      let own = '';
+      let x = own;
+      if (!x && ev.page_w && ev.w / ev.page_w >= 1.3) { const r = ev.w / ev.page_w; x = tr('頁面上那張的 {r} 倍', { r: r >= 10 ? Math.round(r) : r.toFixed(1) }); }
+      if (n > 1 && !own) $('proofDims').textContent = tr('最大 {d}', { d: `${ev.w} × ${ev.h}` });
+      $('proofX').textContent = x;
+    } else { $('proofDims').textContent = ''; $('proofX').textContent = ''; }
+    // 追蹤：一整批才有意義
+    let batchy = (total > 1 || ev.added > 1) && !ev.baseline;
+    $('followBtn').classList.toggle('hide', !batchy);
+    $('followBtn').textContent = ev.following ? tr('追蹤中 ✓') : tr('追蹤，之後只抓新的');
+    $('followBtn').classList.toggle('on', !!ev.following);
+    // 縮圖拖出去：單張＝那個檔；一批＝整個資料夾
+    const dragTarget = lastFile || ev.dup_of || lastFolder;
+    $('cardIcon').onmousedown = () => { if (mode === 'done' && dragTarget) send('dragArm', { files: [dragTarget] }); };
+    paint();
+  }
+
+  // ── 拖移視窗（空白處）──
+  (() => {
+    let moving = false, lx = 0, ly = 0;
+    const noDrag = t => t.closest('button, textarea, input, a, .what, .opts, .bd, .tile, .proof');
+    document.addEventListener('mousedown', e => { if (e.button !== 0 || noDrag(e.target)) return; moving = true; lx = e.screenX; ly = e.screenY; });
+    document.addEventListener('mousemove', e => { if (!moving) return; const dx = e.screenX - lx, dy = e.screenY - ly; if (dx || dy) { send('drag', { dx, dy }); lx = e.screenX; ly = e.screenY; } });
+    const stop = () => { moving = false; };
+    document.addEventListener('mouseup', stop); window.addEventListener('blur', stop);
+  })();
+
+  // ── 拖放連結＝直接進佇列開跑 ──
+  document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('dropping'); });
+  document.addEventListener('dragleave', () => document.body.classList.remove('dropping'));
+  document.addEventListener('drop', e => {
+    e.preventDefault(); document.body.classList.remove('dropping');
+    const raw = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain') || '';
+    const urls = raw.split(/[\n\s]+/).filter(u => /^https?:\/\//.test(u));
+    if (urls.length) send('queueAdd', withMode({ urls }, '*'));
+  });
+
+  // ── JS → Swift ──
+  function nudge() { const w = $('what'); w.classList.remove('nudge'); void w.offsetWidth; w.classList.add('nudge'); }
+  function go() {
+    if (mode === 'run') { send('cancel'); return; }
+    const urls = urlsNow();
+    if (!urls.length) { if (mode !== 'idle') { mode = 'idle'; paint(); } nudge(); $('url').focus(); return; }
+    send('start', withMode({ urls }, kind));
+  }
+  $('orbBtn').onclick = go;
+  $('pasteBtn').onclick = () => send('paste');
+  $('clearBtn').onclick = () => { $('url').value = ''; previewFor = ''; preview = null; onInput(); $('url').focus(); };
+  $('openBtn').onclick = () => { if (lastSheet) send('openFile', { file: lastSheet }); else if (lastFile) send('openFile', { file: lastFile }); else if (lastDoneEv?.dup_of) send('reveal', { file: lastDoneEv.dup_of }); else send('openDest'); };
+  $('revealBtn').onclick = () => lastFile ? send('reveal', { file: lastFile }) : (lastDoneEv?.dup_of ? send('reveal', { file: lastDoneEv.dup_of }) : send('openDest'));
+  $('followBtn').onclick = () => { if ($('followBtn').classList.contains('on')) return; send('followAdd'); $('followBtn').textContent = tr('追蹤中 ✓'); $('followBtn').classList.add('on'); };
+  $('openDestBtn').onclick = () => send('openDest');
+  $('histClear').onclick = () => send('histClear');
+  $('followCheck').onclick = () => send('followCheck');
+  $('pick').onclick = () => send('pick');
+  document.querySelectorAll('#clipSeg button, #wclipSeg button').forEach(b => b.onclick = () => send('clipMode', { mode: b.dataset.clip }));
+  $('copyRow').onclick = () => send('copyAfter', { on: !$('copySw').classList.contains('on') });
+  $('dedupRow').onclick = () => send('dedup', { on: !$('dedupSw').classList.contains('on') });
+  $('bookmarklet').onclick = e => { e.preventDefault(); toast(tr('把這顆拖到書籤列。在任何網頁按一下，就交給 Fully。')); };
+  $('bmCopy').onclick = () => send('copyBookmarklet');
+  document.querySelectorAll('#seg button').forEach(b => b.onclick = () => send('theme', { mode: b.dataset.theme }));
+  document.querySelectorAll('#langSeg button').forEach(b => b.onclick = () => send('lang', { lang: b.dataset.lang }));
+  $('docTerms').onclick = () => send('openDoc', { doc: 'terms' });
+  $('docPrivacy').onclick = () => send('openDoc', { doc: 'privacy' });
+
+  // 次頁
+  let pageBack = '';
+  const openPage = (id, stack) => {
+    const curPage = document.body.dataset.page || '';
+    pageBack = stack ? curPage : '';
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.id === id));
+    document.body.dataset.page = id || '';
+    if (id === 'pRecent') { showTab(false); if (history.length) send('histThumbs'); }
+  };
+  $('recentBtn').onclick = () => openPage('pRecent');
+  $('settingsBtn').onclick = () => openPage('pSettings');
+  $('sitesBtn').onclick = () => openPage('pSites', true);
+  document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => {
+    const id = b.closest('.page').id;
+    openPage(id === 'pDoc' ? (pageBack || (!$('wiz').classList.contains('hide') ? '' : 'pSettings')) : id === 'pSites' ? 'pSettings' : '');
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { if (document.body.dataset.page) openPage(document.body.dataset.page === 'pDoc' && pageBack ? pageBack : ''); else send('hide'); return; }
+    if (e.key === 'Enter' && !e.shiftKey && !document.body.dataset.page && $('wiz').classList.contains('hide')) { e.preventDefault(); go(); }
+  });
+  // 卡片狀態下輸入框是藏起來的：⌘V 貼在哪裡都接
+  document.addEventListener('paste', e => { if (e.target === $('url') || mode === 'run') return;
+    const t = e.clipboardData?.getData('text') || ''; if (/https?:\/\//.test(t)) { e.preventDefault(); mode = 'idle'; $('url').value = t.trim(); onInput(); } });
+
+  // 跟隨系統時靠 prefers-color-scheme 判斷暗色
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const sysdark = () => document.documentElement.classList.toggle('sysdark', mq.matches);
+  mq.addEventListener('change', sysdark); sysdark();
+
+  // 鍵帽
+  const KEY = { control: ['⌃', 'control'], option: ['⌥', 'option'], command: ['⌘', 'command'], shift: ['⇧', 'shift'], enter: ['↩', 'return'] };
+  document.querySelectorAll('[data-keys]').forEach(el => {
+    el.innerHTML = el.dataset.keys.split(/\s+/).map(k => { const [sym, name] = KEY[k] || [k, '']; return `<span class="kc${name ? '' : ' letter'}"><span class="s">${sym}</span>${name ? `<span class="n">${name}</span>` : ''}</span>`; }).join('');
+  });
+
+  // ── 精靈：頁面清單 ──
+  let wizIdx = 0, agreed = false;
+  let wizPages = () => ['welcome', 'dest', 'call'];
+  function wizGo(i) {
+    const pages = wizPages(), last = pages.length - 1;
+    wizIdx = Math.max(0, Math.min(last, i));
+    const key = pages[wizIdx];
+    document.querySelectorAll('.wpage').forEach(el => el.classList.toggle('on', el.dataset.p === key));
+    $('wstep').textContent = wizIdx === 0 ? '' : `${wizIdx}／${last}`;
+    $('wback').style.visibility = wizIdx === 0 ? 'hidden' : 'visible';
+    $('wskip').style.display = (wizIdx === 0 || wizIdx === last) ? 'none' : '';
+    $('wpb').style.visibility = wizIdx === 0 ? 'visible' : 'hidden';
+    $('wnext').textContent = wizIdx === 0 ? tr('開始設定') : (wizIdx === last ? tr('好了，開始用') : tr('下一步'));
+    $('wnext').disabled = wizIdx === 0 && !agreed;          // 使用規範：勾了「我了解」才能繼續
+  }
+  $('agreeBox').onclick = () => { agreed = !agreed; $('agree').classList.toggle('on', agreed); send('agree', { on: agreed }); wizGo(wizIdx); };
+  $('wTerms').onclick = () => send('openDoc', { doc: 'terms' });
+  $('wnext').onclick = () => { if (wizIdx === 0 && !agreed) return; if (wizIdx === 0) send('checkUpdate'); if (wizIdx === wizPages().length - 1) { send('wizardDone'); return; } wizGo(wizIdx + 1); };
+  $('wskip').onclick = () => wizGo(wizIdx + 1);
+  $('wback').onclick = () => wizGo(wizIdx - 1);
+  $('wpick').onclick = () => send('pick');
+
+  // 截圖與設計審查用（--demo <state>）：餵假事件把畫面擺到那個狀態，不碰網路。
+  // 假資料是自己的網頁（官網截圖用）
+  window.__demo = s => {
+    document.body.classList.add('freeze'); const E = window.appEvent;
+    let D = { url: 'https://www.intention.ltd/made', name: 'INTENTION Made', label: tr('網頁'), kind: 'web', count: 42,
+      recent: [{ name: 'INTENTION Made', kind: tr('網頁'), when: '9/24 16:55', dims: '4032×3024' }, { name: 'INTENTION — Works', kind: tr('網頁'), when: '9/23 21:10', dims: '3000×2000' }, { name: 'INTENTION Journal', kind: tr('網頁'), when: '9/22 11:02', dims: '2400×1600' }],
+      follows: [{ id: 'a', name: 'INTENTION Journal', lastCheck: '9/24 12:00', lastNew: 3 }, { id: 'b', name: 'INTENTION — Works', lastCheck: '9/24 12:00', lastNew: 0 }],
+      done: { added: 40, skipped: 2, w: 4032, h: 3024, page_w: 640, dups: 0 }, one: { w: 4032, h: 3024, page_w: 236 },
+      err: tr('這個網頁不是公開的。Fully 只存公開看得到的圖。') };
+    const src = () => { $('url').value = D.url; onInput(); E({ type: 'started', url: D.url }); E({ type: 'source', kind: D.kind, label: D.label, name: D.name, count: D.count, folder: '/x/' + D.name }); };
+    const pv = () => E({ type: 'preview', url: D.url, kind: D.kind, label: D.label, name: D.name, count: D.count, w: D.done.w, h: D.done.h, multi: true });
+    E({ type: 'history', items: D.recent }); E({ type: 'follows', items: D.follows });
+    const states = { image: () => { $('url').value = D.url; onInput(); pv(); },
+       resolve: () => { $('url').value = D.url; onInput(); E({ type: 'started', url: D.url }); },
+       run: () => { src(); E({ type: 'item', index: 17 }); $('sub').innerHTML = tr('下載中') + tr('，') + tr('大約還要 {n} 分鐘', { n: 1 }) + (LANG === 'en' ? '.' : '。'); },
+       done: () => { src(); E({ type: 'done', ...D.done, headline: D.name, folder: '/x/Fully/' + D.name, file: null, sheet: '/x/s.jpg', url: D.url }); },
+       doneone: () => { $('url').value = D.url; onInput(); E({ type: 'started', url: D.url }); E({ type: 'source', kind: D.kind, label: D.label, name: D.name, count: 1, folder: '/x/' + D.name });
+                        E({ type: 'done', added: 1, skipped: 0, ...D.one, headline: D.name, folder: '/x/' + D.name, file: '/x/a.jpg', url: D.url }); E({ type: 'copied' }); },
+       err: () => { $('url').value = D.url; onInput(); E({ type: 'started', url: D.url }); E({ type: 'error', message: D.err, ...(D.errExtra || {}) }); },
+       batch: () => { src(); E({ type: 'batch', ok: 3, total: 4, failed: [{ name: D.name, msg: D.err }] }); },
+       pick: () => { $('url').value = D.url; onInput(); pv(); openPicker(); renderPicker(Array.from({ length: 12 }, (_, i) => ({ id: String(i + 1), thumb: '' }))); [...pickSel].slice(0, 3).forEach(id => pickSel.delete(id)); $('pickGrid').querySelectorAll('.cell').forEach((c, i) => c.classList.toggle('on', i >= 3)); paintPickFoot(); },
+       recent: () => openPage('pRecent'), follows: () => { openPage('pRecent'); showTab(true); },
+       settings: () => openPage('pSettings'), sites: () => openPage('pSites'),
+       terms: () => send('openDoc', { doc: 'terms' }), privacy: () => send('openDoc', { doc: 'privacy' }) };
+    if (states[s]) states[s]();
+  };
+
+  classify(); translate(); paint(); wizGo(0);
+  // 等整頁載完才跟 Swift 說好了，第一批事件才不會比介面早到
+  window.addEventListener('load', () => {
+    classify(); translate(); paint(); wizGo(0); send('ready');
+  });
+})();
+</script>

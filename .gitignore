@@ -1,0 +1,17 @@
+# 第三方的執行檔與規則庫：不進 git（用 scripts/vendor-fetch.sh 準備）
+vendor/
+
+# 建置產物
+build/
+
+# Python 快取（內含建置機的絕對路徑）
+__pycache__/
+*.pyc
+
+# 備份與系統雜物
+*.bak
+*.bak-*
+.DS_Store
+
+# 公證用的 notarytool 鑰匙圈 profile 名（每台機器自己的，見 scripts/notarize.sh）
+.notary-profile
