@@ -1,5 +1,9 @@
 # Fully
 
+[![下載 Fully（macOS）](https://img.shields.io/badge/%E4%B8%8B%E8%BC%89-macOS-000000?style=for-the-badge&logo=apple&logoColor=white&labelColor=000000)](https://github.com/intentionltd888/fully/releases/latest/download/Fully.dmg)
+[![最新版本](https://img.shields.io/github/v/release/intentionltd888/fully?style=for-the-badge&label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC&labelColor=000000&color=555555)](https://github.com/intentionltd888/fully/releases/latest)
+[![下載次數](https://img.shields.io/github/downloads/intentionltd888/fully/total?style=for-the-badge&label=%E4%B8%8B%E8%BC%89%E6%AC%A1%E6%95%B8&labelColor=000000&color=555555)](https://github.com/intentionltd888/fully/releases)
+
 把你有權使用的圖片，以原尺寸存下來。[English](README.en.md)
 
 Fully 是 macOS 上的設計參考收集工具（design reference collector）：複製一個網頁的網址，它會掃出頁面上公開看得到的圖片，一張張換成原始尺寸再存下來——不是頁面上的縮圖。

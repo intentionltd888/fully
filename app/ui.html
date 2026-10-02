@@ -478,6 +478,7 @@
     '不到 1 分鐘': 'under a minute', '大約還要 {n} 分鐘': 'about {n} min left', '，': ', ',
     '{a}／{b} 張': '{a} / {b}', '{n} 張': '{n}', '邊讀邊抓，抓的是原始尺寸。': 'Saving as it reads — at original size.',
     '存好了': 'Saved', '之前就抓過了': 'Already saved', '早就有了': 'Already saved', '沒有夠大的圖': 'No big images', '這次沒抓到': 'Nothing came through',
+    '只有預覽圖': 'Preview image only', '這一頁本身讀不到圖，只存到分享連結時顯示的那張預覽圖，放在「{w}」。': "Couldn't read any images from the page itself — saved only the preview image shown when the link is shared, in “{w}”.",
     '這一頁的圖都太小（像圖示、按鈕），沒有存。': 'Everything on this page was tiny (icons, buttons) — nothing saved.',
     '{n} {u}，放在「{w}」。': '{n} {u} in “{w}”.', '放在「{w}」。': 'In “{w}”.', '全部 {n} {u}都已經在「{w}」裡。': 'All {n} {u} are already in “{w}”.',
     '另外 {n} {u}略過（抓過或太小）': '{n} {u} skipped (already there or too small)', '{n} {u}抓不到': "{n} {u} couldn't be grabbed",
@@ -831,9 +832,11 @@
     $('nameLine').textContent = ev.headline || curName || '';
     const sm = ev.small || 0, allSmall = !n && !du && sk > 0 && sm >= sk;   // 全部都是太小的（像圖示）：不是「之前抓過」
     const allFail = !n && !du && !sk && fl > 0;                            // 一張都沒下載成功（main.swift doneHead 同一套）
-    const head = n ? tr('存好了') : (du ? tr('早就有了') : allSmall ? tr('沒有夠大的圖') : allFail ? tr('這次沒抓到') : tr('之前就抓過了'));
+    const pv = n > 0 && !!ev.preview_only;                                 // 頁面本身讀不到圖、存到的只是分享預覽圖（grab.py _scan_page）：照實講（main.swift doneHead 同一套）
+    const head = n ? (pv ? tr('只有預覽圖') : tr('存好了')) : (du ? tr('早就有了') : allSmall ? tr('沒有夠大的圖') : allFail ? tr('這次沒抓到') : tr('之前就抓過了'));
     const lines = [];
-    if (n) lines.push(n === 1 ? tr('放在「{w}」。', { w: esc(where) }) : tr('{n} {u}，放在「{w}」。', { n, u, w: esc(where) }));
+    if (pv) lines.push(tr('這一頁本身讀不到圖，只存到分享連結時顯示的那張預覽圖，放在「{w}」。', { w: esc(where) }));
+    else if (n) lines.push(n === 1 ? tr('放在「{w}」。', { w: esc(where) }) : tr('{n} {u}，放在「{w}」。', { n, u, w: esc(where) }));
     else if (allSmall) lines.push(tr('這一頁的圖都太小（像圖示、按鈕），沒有存。'));
     else if (!du && !allFail) lines.push(tr('全部 {n} {u}都已經在「{w}」裡。', { n: sk, u, w: esc(where) }));
     const minor = [sk && n ? tr('另外 {n} {u}略過（抓過或太小）', { n: sk, u }) : '', fl ? tr('{n} {u}抓不到', { n: fl, u }) : ''].filter(Boolean).join(tr('，'));

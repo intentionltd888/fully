@@ -1104,7 +1104,7 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
     static func doneHead(_ ev: [String: Any]) -> String {
         let n = ev["added"] as? Int ?? 0, sk = ev["skipped"] as? Int ?? 0, du = ev["dups"] as? Int ?? 0
         let sm = ev["small"] as? Int ?? 0, fl = ev["failed"] as? Int ?? 0
-        if n > 0 { return L("存好了", "Saved") }
+        if n > 0 { return (ev["preview_only"] as? Bool == true) ? L("只有預覽圖", "Preview image only") : L("存好了", "Saved") }   // 頁面本身讀不到圖，只存到分享預覽圖
         if du > 0 { return L("早就有了", "Already saved") }
         if sk > 0 && sm >= sk { return L("沒有夠大的圖", "No big images") }
         if sk == 0 && fl > 0 { return L("這次沒抓到", "Nothing came through") }

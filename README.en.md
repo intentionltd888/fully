@@ -1,5 +1,9 @@
 # Fully
 
+[![Download Fully for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white&labelColor=000000)](https://github.com/intentionltd888/fully/releases/latest/download/Fully.dmg)
+[![Latest release](https://img.shields.io/github/v/release/intentionltd888/fully?style=for-the-badge&label=release&labelColor=000000&color=555555)](https://github.com/intentionltd888/fully/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/intentionltd888/fully/total?style=for-the-badge&label=downloads&labelColor=000000&color=555555)](https://github.com/intentionltd888/fully/releases)
+
 Save images you have the right to use — at their original size. [中文](README.md)
 
 Fully is a design reference collector for macOS. Copy the link of a web page and Fully finds the publicly visible images on it, swaps each one for its original-size file and saves it — not the thumbnail you see on the page.

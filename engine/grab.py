@@ -308,7 +308,9 @@ def _web_rows(cands, referer):
 
 
 def _scan_page(url, sess):
-    """開網頁、掃圖（含同網域 frame／iframe），回 (final_url, page, rows, 名字)。grab_web 與預覽共用。"""
+    """開網頁、掃圖（含同網域 frame／iframe），回 (final_url, page, rows, 名字, preview_only)。grab_web 與預覽共用。
+    preview_only＝整頁只認得出一張，而且只來自 og:image（或同一張當 CSS 背景）：頁面本身讀不到圖，
+    存得到的只是分享連結時顯示的那張預覽圖。完成畫面要照實講，不能說成一般的「存好了」。"""
     try:
         final_url, page = sess.get_page(url)
     except urllib.error.HTTPError as e:
@@ -352,11 +354,13 @@ def _scan_page(url, sess):
                     pass
         except Exception:
             pass
-    return final_url, page, _web_rows(cands, final_url), _page_title(page, final_url)
+    rows = _web_rows(cands, final_url)
+    preview_only = len(rows) == 1 and any(p == 2 for p, _, _ in cands) and all(p in (2, 4) for p, _, _ in cands)
+    return final_url, page, rows, _page_title(page, final_url), preview_only
 
 
 def grab_web(url, dest, sess):
-    final_url, page, rows, name = _scan_page(url, sess)
+    final_url, page, rows, name, preview_only = _scan_page(url, sess)
 
     if not rows:
         pg.die(T("這個網頁上抓不到圖片。有些網站的圖要捲動才載入，或不是公開的。",
@@ -367,10 +371,10 @@ def grab_web(url, dest, sess):
         pg.log(f"  （找到 {len(rows)} 張，只取可信度最高的前 {WEB_CAP} 張）")
         rows = rows[:WEB_CAP]
     rows = picked(rows)
-    _save_rows(rows, dest, name, _host(final_url) or T("網頁", "Web page"), "web")
+    _save_rows(rows, dest, name, _host(final_url) or T("網頁", "Web page"), "web", preview_only=preview_only)
 
 
-def _save_rows(rows, dest, name, label, kind):
+def _save_rows(rows, dest, name, label, kind, preview_only=False):
     """網頁掃圖與 --list 清單共用：開資料夾 → 同時下載 → done。"""
     folder = os.path.join(dest, pg.safe_name(name, 60, keep_space=True) or "web")
     pg.log(f"\n  網頁：{name}")
@@ -384,8 +388,12 @@ def _save_rows(rows, dest, name, label, kind):
            + (f"、略過 {res.skipped} 張" if res.skipped else "")
            + (f"、一模一樣已經有的 {res.dups} 張" if res.dups else "")
            + (f"、抓不到 {res.failed} 張" if res.failed else ""))
+    extra = {}
+    if preview_only and res.ok:
+        pg.log("  （頁面本身讀不到圖，存到的是分享預覽圖）")
+        extra["preview_only"] = True
     pg.emit(type="done", added=res.ok, skipped=res.skipped, failed=res.failed, folder=folder,
-            headline=name[:40], **img_done(res))
+            headline=name[:40], **img_done(res), **extra)
 
 
 def grab_list(listfile, dest):
@@ -420,7 +428,7 @@ def _session():
 
 def _probe_web(url):
     sess = _session()
-    final_url, page, rows, name = _scan_page(url, sess)
+    final_url, page, rows, name, _ = _scan_page(url, sess)
     og = re.search(r'<meta[^>]+(?:property|name)=["\']og:image(?::url)?["\'][^>]+content=["\']([^"\']+)["\']', page or "", re.I)
     thumb = urllib.parse.urljoin(final_url, htmllib.unescape(og.group(1))) if og else (rows[0]["thumb"] if rows else None)
     out = {"name": name, "count": min(len(rows), WEB_CAP), "thumb": thumb}
