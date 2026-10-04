@@ -37,7 +37,7 @@ Fully 是給設計與研究工作用的參考收集工具：貼上一個網址�
 Fully 不存放任何內容。如果你認為有人用 Fully 侵害了你的權利，請直接向該內容所在的網站檢舉。如果你認為 Fully 本身有問題，請在公開倉開一則 Issue，我們會在 3 個工作天內回覆。
 
 ### 開源授權與變更
-程式碼授權見 `LICENSE`，第三方元件見 `THIRD-PARTY-NOTICES`。本規範會隨版本更新，以公開倉上的最新版為準。生效日：`__生效日__`。
+程式碼授權見 `LICENSE`，第三方元件見 `THIRD-PARTY-NOTICES`。本規範會隨版本更新，以公開倉上的最新版為準。生效日：2026 年 10 月 5 日。
 
 ---
 
@@ -78,4 +78,4 @@ Fully is a reference collector for design and research work. Paste a link and Fu
 Fully stores no content. If you believe someone used Fully to infringe your rights, please report the content to the website where it is hosted. If you believe Fully itself is the problem, open an issue in the public repository and we will reply within 3 business days.
 
 ### License and changes
-Code license: `LICENSE`. Third-party components: `THIRD-PARTY-NOTICES`. These terms change with releases; the latest version in the public repository applies. Effective: `__生效日__`.
+Code license: `LICENSE`. Third-party components: `THIRD-PARTY-NOTICES`. These terms change with releases; the latest version in the public repository applies. Effective: October 5, 2026.

@@ -864,9 +864,9 @@
     const lines = [];
     if (pv) lines.push(tr('這一頁本身讀不到圖，只存到分享連結時顯示的那張預覽圖，放在「{w}」。', { w: esc(where) }));
     else if (n) lines.push(n === 1 ? tr('放在「{w}」。', { w: esc(where) }) : tr('{n} {u}，放在「{w}」。', { n, u, w: esc(where) }));
-    if (n > 1 && ev.videos) lines.push(tr('其中 {n} 支是影片。', { n: ev.videos }));   // 圖版裡的影片 pin 存的是影片本身
     else if (allSmall) lines.push(tr('這一頁的圖都太小（像圖示、按鈕），沒有存。'));
     else if (!du && !allFail) lines.push(tr('全部 {n} {u}都已經在「{w}」裡。', { n: sk, u, w: esc(where) }));
+    if (n > 1 && ev.videos) lines.push(tr('其中 {n} 支是影片。', { n: ev.videos }));   // 圖版裡的影片 pin 存的是影片本身（放在上面那串 if／else 的外面）
     const minor = [sk && n ? tr('另外 {n} {u}略過（抓過或太小）', { n: sk, u }) : '', fl ? tr('{n} {u}抓不到', { n: fl, u }) : ''].filter(Boolean).join(tr('，'));
     if (minor) lines.push(minor + (LANG === 'en' ? '.' : '。'));
     if (du) lines.push(ev.dup_saved ? tr('其中 {n} 張跟之前抓的一模一樣', { n: du }) : tr('{n} 張跟之前抓的一模一樣，沒再存一份', { n: du }));

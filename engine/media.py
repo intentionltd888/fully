@@ -42,7 +42,7 @@ def kind_of(url):
     host = _host(url)
     if PIN.claims(host) and PIN.handles(url):
         return "board"
-    return "video" if VIDEO.is_video_host(host) else None
+    return "video" if VIDEO.is_video_host(host) or VIDEO.is_video_file(url) else None
 
 
 def probe(kind, url):

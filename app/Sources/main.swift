@@ -646,7 +646,7 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
             // 首啟精靈：沒跑過（或 --wizard）就蓋在主面板上，而且**面板要自己打開**
             if selftest == nil, (!wizardDone || forceWizard) {
                 emit(["type": "wizard", "show": true, "page": wizardPage, "clip": Prefs.clipMode, "agreed": Prefs.agreed,
-                      "auto": EngineManager.shared.autoOn])
+                      "auto": isSnapshotRun ? true : EngineManager.shared.autoOn])
                 if !isSnapshotRun {
                     showPanel()
                     if let f = floating, f.frame.height < Const.panelSize.height {
@@ -881,8 +881,12 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
     private func engineReady() {
         // 影片引擎：先把狀態推給介面，再看要不要背景檢查更新（每天一次）
         let eng = EngineManager.shared
-        emit(eng.status(fast: true).dict)          // 第一眼先給出廠版本，免得精靈那頁空著
-        guard selftest == nil else { return }
+        var first = eng.status(fast: true)         // 第一眼先給出廠版本，免得精靈那頁空著
+        if isSnapshotRun {                          // 截圖照新使用者的預設（自動更新開），不帶這台 Mac 自己的設定
+            first.auto = true; first.status = "還沒檢查"; first.checkedAt = ""
+        }
+        emit(first.dict)
+        guard selftest == nil, !isSnapshotRun else { return }
         DispatchQueue.global(qos: .utility).async {
             eng.ensureStable()
             let st = eng.status()

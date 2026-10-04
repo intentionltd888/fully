@@ -34,6 +34,7 @@
   const hostOf = u => { try { return new URL(u).hostname.toLowerCase().replace(/^www\./, ''); } catch (e) { return ''; } };
   const isVideoHost = h => VIDEO_HOSTS.some(d => h === d || h.endsWith('.' + d));
   const isBoard = h => /(^|\.)pinterest\.[a-z.]+$/.test(h) || h === 'pin.it';
+  const isVideoFile = u => { try { return /\.(mp4|mov|m4v|webm|mkv|m3u8)$/i.test(new URL(u).pathname); } catch (e) { return false; } };   // 直接指到影片檔（跟 video.py 的 is_video_file 對齊）
 
   const GET = { av: '最高畫質，存好直接能播；有中英字幕會一起存。', audio: '存成一首帶封面的音樂檔。',
                 frames: '影片抓完，每換一個鏡頭截一張，<br>再拼成一張總覽圖。', data: '不抓影片：標題、觀看數、發布日、留言，<br>整理成一張表。' };
@@ -134,7 +135,7 @@
     translate() { mountWizard(); mountSites(); renderSettings(); if ($('get')) mountAsk(); },
     classify(u) {
       const h = hostOf(u);
-      if (isVideoHost(h)) return { label: tr('影片'), kind: 'video' };
+      if (isVideoHost(h) || isVideoFile(u)) return { label: tr('影片'), kind: 'video' };
       if (pick !== 'av') setPick('av');
       if (isBoard(h)) return { label: tr('圖版'), kind: 'image' };
       return null;
@@ -172,7 +173,8 @@
       }
       return false;
     },
-    demo(state) { if (state === 'video') { $('url').value = 'https://vimeo.com/22439234'; $('url').dispatchEvent(new Event('input')); } },
+    // 截圖用的影片網址：自己的網域、直接指到影片檔（官網截圖不露任何站名）
+    demo(state) { if (state === 'video') { $('url').value = 'https://www.intention.ltd/made/fully.mp4'; $('url').dispatchEvent(new Event('input')); } },
     // 給疊上去的那份用：現在選的影片要法、重畫設定頁
     pickMode() { return pick; },
     refreshSettings() { renderSettings(); },

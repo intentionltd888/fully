@@ -53,6 +53,15 @@ def is_video_host(host):
     return any(host == h or host.endswith("." + h) for h in HOSTS)
 
 
+VIDEO_EXT = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".m3u8")
+
+
+def is_video_file(url):
+    """網址直接指到影片檔（或串流清單）：交給影片線（yt-dlp 的通用擷取），不要當網頁整檔讀進記憶體再掃圖。"""
+    path = urllib.parse.urlparse(url).path.lower()
+    return path.endswith(VIDEO_EXT)
+
+
 def find_ytdlp():
     """Application Support 的自更新版（FULLY_YTDLP，app 的 Engines.swift 每天更新）→ 包內出廠版 → Homebrew → PATH → python 模組。"""
     managed = os.environ.get("FULLY_YTDLP", "")
