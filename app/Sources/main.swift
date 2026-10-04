@@ -161,7 +161,7 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         var l: [String] = []
         return l
     }()
-    private static let fileExts = ["jpg", "jpeg", "png", "webp", "gif", "avif", "heic", "svg"]
+    private static let fileExts = ["jpg", "jpeg", "png", "webp", "gif", "avif", "heic", "svg", "mp4", "mov", "m4v", "webm", "m3u8"]
     static func looksLikeMedia(_ u: String) -> Bool {
         guard let url = URL(string: u), let host = url.host?.lowercased() else { return false }
         if mediaHosts.contains(where: { host == $0 || host.hasSuffix("." + $0) || ($0.hasSuffix(".") && host.contains($0)) }) { return true }
@@ -642,11 +642,11 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
             emit(["type": "about", "version": info?["CFBundleShortVersionString"] as? String ?? "",
                   "build": info?["CFBundleVersion"] as? String ?? ""])
             if selftest == nil { emit(["type": "history", "items": Array(history.prefix(8))]); pushFollows() }
+            engineReady()
             // 首啟精靈：沒跑過（或 --wizard）就蓋在主面板上，而且**面板要自己打開**
             if selftest == nil, (!wizardDone || forceWizard) {
-                let base: [String: Any] = ["type": "wizard", "show": true, "page": wizardPage, "clip": Prefs.clipMode, "agreed": Prefs.agreed]
-                let w = base
-                emit(w)
+                emit(["type": "wizard", "show": true, "page": wizardPage, "clip": Prefs.clipMode, "agreed": Prefs.agreed,
+                      "auto": EngineManager.shared.autoOn])
                 if !isSnapshotRun {
                     showPanel()
                     if let f = floating, f.frame.height < Const.panelSize.height {
@@ -709,6 +709,7 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         case "wizardDone":
             UserDefaults.standard.set(true, forKey: Const.wizardKey)
             emit(["type": "wizard", "show": false])
+            EngineManager.shared.checkForUpdate(force: false) { s in self.emit(s.dict) }
 
         case "agree":
             Prefs.agreed = body["on"] as? Bool ?? true
@@ -863,8 +864,34 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         case "quit":
             NSApp.terminate(nil)
 
+        // 影片引擎自動更新：設定裡的開關、精靈與設定裡的「現在檢查」
+        case "autoUpdate":
+            let on = body["on"] as? Bool ?? true
+            EngineManager.shared.autoOn = on
+            emit(EngineManager.shared.status(fast: true).dict)      // fast：不在主執行緒跑 --version
+            if on { EngineManager.shared.checkForUpdate(force: true) { s in self.emit(s.dict) } }
+        case "checkUpdate":
+            EngineManager.shared.checkForUpdate(force: true) { s in self.emit(s.dict) }
+
         default:
             break
+        }
+    }
+
+    private func engineReady() {
+        // 影片引擎：先把狀態推給介面，再看要不要背景檢查更新（每天一次）
+        let eng = EngineManager.shared
+        emit(eng.status(fast: true).dict)          // 第一眼先給出廠版本，免得精靈那頁空著
+        guard selftest == nil else { return }
+        DispatchQueue.global(qos: .utility).async {
+            eng.ensureStable()
+            let st = eng.status()
+            DispatchQueue.main.async {
+                self.emit(st.dict)
+                if !self.forceWizard || self.wizardDone {
+                    eng.checkForUpdate(force: false) { s in self.emit(s.dict) }
+                }
+            }
         }
     }
 
@@ -1000,7 +1027,8 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         updateSide()
 
         prepareArgs(job) { extra in
-            let flag: [String] = []
+            // 影片的「要什麼」：audio 只要聲音／data 標題與留言／frames 每個鏡頭截圖；av（預設）＝影片本身
+            let flag: [String] = ["audio": ["--audio"], "data": ["--data"], "frames": ["--frames"]][job.mode] ?? []
             let tail = ["--json"] + flag + extra + (job.list != nil ? [self.dest] : [job.url, self.dest])
             let started = EngineRunner.start(tail, onEvent: { ev in self.handle(ev, job: job) },
                                              onExit: { code in self.engineExited(code, job: job) })
@@ -1124,6 +1152,10 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
     /// 「拿到多大」一句話（通知、預覽卡用；介面層自己組中英）。compact＝預覽卡那行比較窄
     static func proofLine(_ ev: [String: Any], compact: Bool = false) -> String {
         guard let w = ev["w"] as? Int, let h = ev["h"] as? Int, w > 0 else { return "" }
+        if let res = ev["res"] as? String {        // 影片：畫質
+            let fps = ev["fps"] as? Int ?? 0
+            return "\(w) × \(h)・" + res + (fps > 30 ? "\(fps)" : "") + ((ev["hdr"] as? Bool == true) ? " HDR" : "")
+        }
         var s = "\(w) × \(h)"
         if let pw = ev["page_w"] as? Int, pw > 0, Double(w) / Double(pw) >= 1.3 {
             let r = Double(w) / Double(pw)
@@ -1172,7 +1204,8 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
     private func finish(job: Job, exitOK: Bool) {
         task = nil
         if !exitOK, !cancelled {
-            let nm = (curSource["name"] as? String) ?? job.url
+            var nm = (curSource["name"] as? String) ?? job.url
+            if nm == "影片" || nm == "Video" { nm = job.url }      // 影片線還沒拿到片名時的暫稱，失敗清單上改寫網址
             batch.append((name: nm, ok: false, msg: lastErr, job: job))
         }
         if !cancelled { queueDone += 1 }
@@ -1252,7 +1285,8 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
                     if !items { self.probeCache[url] = p }
                     self.deliver(p, items: items)
                 case "error":
-                    let p: [String: Any] = ["type": "preview", "url": url, "failed": true, "message": ev["message"] ?? ""]
+                    var p: [String: Any] = ["type": "preview", "url": url, "failed": true, "message": ev["message"] ?? ""]
+                    if ev["not_public"] as? Bool == true { p["not_public"] = true }      // 不是公開的：預覽卡那行照實講
                     self.deliver(p, items: items)
                 default: break
                 }
@@ -1395,7 +1429,8 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         for u in urls where u.scheme == "fully" {
             let q = URLComponents(url: u, resolvingAgainstBaseURL: false)?.queryItems ?? []
             let target = q.first { $0.name == "url" }?.value ?? ""
-            let mode = "av"
+            let asked = q.first { $0.name == "mode" }?.value ?? "av"      // 影片：&mode=audio|frames|data
+            let mode = ["av", "audio", "frames", "data"].contains(asked) ? asked : "av"
             switch u.host {
             case "grab" where target.hasPrefix("http"):
                 enqueue([Job(url: target, mode: mode, card: true)], fresh: task == nil && queue.isEmpty)

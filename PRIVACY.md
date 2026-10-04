@@ -5,19 +5,20 @@
 Fully 沒有自己的伺服器、沒有帳號、沒有遙測。下面是它實際會做的事，一條一條列。
 
 ### 會離開你電腦的
-1. **你貼的網址。** Fully 直接連那個網頁，以及存放它圖片的伺服器，把圖存回來。對方看得到你的 IP，跟你用瀏覽器打開那一頁一樣。有些對流量要求嚴格的網站，Fully 會照規矩報出自己的名字。Fully 不會登入任何網站，也不會讀你瀏覽器裡的任何資料。
+1. **你貼的網址。** Fully 直接連那個網頁，以及存放它圖片或影片的伺服器，把檔案存回來。對方看得到你的 IP，跟你用瀏覽器打開那一頁一樣。有些對流量要求嚴格的網站，Fully 會照規矩報出自己的名字。Fully 不會登入任何網站，也不會讀你瀏覽器裡的任何資料。
 2. **你複製的網址（預設開啟，可以關）。** Fully 開著的時候，會一直留意剪貼簿有沒有新的網址。複製到一個網址時，它會先讀一次那個網頁，在右上角跳出預覽卡（縮圖、名稱、有幾張、能拿到多大），這一步不下載任何檔案。
    - 這些網址不會自動去讀：內部網路、IP 位址、`.local`，以及網址裡有 token、auth、login、code=、session 這類字的（讀了可能把一次性登入連結用掉）。
    - 預覽卡和面板上的縮圖，直接從那個網站的圖片伺服器載入。
    - 設定裡可以改成「關」（完全不看剪貼簿）或「直接抓」。
-3. **你選擇追蹤的網頁。** 在完成畫面按「追蹤」之後，Fully 開著時每 6 小時回去看一次那一頁，只存新的圖。停止方法：最近抓的 → 追蹤中 → 那一列的 ✕。「現在檢查」可以手動看一次。
+3. **你選擇追蹤的網頁。** 在完成畫面按「追蹤」之後，Fully 開著時每 6 小時回去看一次那一頁（或那個影片清單），只存新的。停止方法：最近抓的 → 追蹤中 → 那一列的 ✕。「現在檢查」可以手動看一次。
+4. **影片引擎的更新（預設開啟，可以關）。** 影片網站常改版，所以 Fully 每天在背景向 GitHub 問一次影片引擎（開源的 yt-dlp）有沒有新版，有就下載官方發行版換上（會先核對官方的檢查碼）。另外兩種情況也會連 GitHub：抓某些影片網站時，引擎會下載官方發行的解挑戰元件；某個影片抓不動、看起來是網站剛改版時，會改用引擎的搶先版再試一次。這幾次都只連 GitHub，不送出你的任何資料。設定 →「自動跟上網站改版」可以關掉每天的檢查。
 
-除了以上三項，Fully 不連任何網路：沒有自動更新、沒有使用分析、沒有當機回報、沒有廣告，也不連我們的伺服器。新版會放在官網與公開倉，下載新的 DMG 蓋過去就好。
+除了以上四項，Fully 不連任何網路：除了影片引擎，Fully 本身沒有自動更新；沒有使用分析、沒有當機回報、沒有廣告，也不連我們的伺服器。Fully 的新版會放在官網與公開倉，下載新的 DMG 蓋過去就好。
 
 ### 留在你電腦上的
-- **存下的圖片**：預設在 `~/Downloads/Fully`，照來源自動開子資料夾；位置可以在設定裡改。每個檔案會記下它的來源網址（Finder 的「來源」欄）。
+- **存下的圖片與影片**：預設在 `~/Downloads/Fully`，照來源自動開子資料夾；位置可以在設定裡改。每個檔案會記下它的來源網址（Finder 的「來源」欄）。
 - **最近抓的、設定、還沒抓完的清單**：存在本機的 app 設定裡（最近抓的只留 30 筆）。
-- **`~/Library/Application Support/Fully/`**：`hash-index.json` 用來記住抓過哪些圖，同一張不存兩次（設定可關）；`follows.json` 是你追蹤的網頁清單。
+- **`~/Library/Application Support/Fully/`**：`hash-index.json` 用來記住抓過哪些圖，同一張不存兩次（設定可關）；`follows.json` 是你追蹤的網頁清單；`engines/` 是影片引擎與它的更新；`archives/` 記著追蹤的影片清單抓過哪幾支。
 
 ### 權限：macOS 會問你的，以及 Fully 會動到的
 
@@ -49,19 +50,20 @@ Fully 不會要求：完整磁碟取用、輔助使用、螢幕錄影、麥克�
 Fully has no server, no account and no telemetry. Here is everything it actually does.
 
 ### What leaves your Mac
-1. **The link you paste.** Fully connects straight to that page and the servers that host its images, and saves the images. The site sees your IP address, exactly as if you opened the page in a browser. Sites with strict traffic rules see Fully identify itself by name. Fully never signs in to any website and never reads anything from your browsers.
+1. **The link you paste.** Fully connects straight to that page and the servers that host its images or videos, and saves the files. The site sees your IP address, exactly as if you opened the page in a browser. Sites with strict traffic rules see Fully identify itself by name. Fully never signs in to any website and never reads anything from your browsers.
 2. **Links you copy (on by default, can be turned off).** While Fully is running it watches the clipboard for new links. When you copy one, it reads that page once to show a preview card in the top-right corner (thumbnail, name, how many images, how large they are). No files are downloaded at this step.
    - These are never read automatically: local network addresses, IP addresses, `.local`, and links containing words like token, auth, login, code=, or session (reading them could use up a one-time sign-in link).
    - Thumbnails on the card and in the panel load directly from that site's image servers.
    - In Settings you can switch this to "Off" (the clipboard is not watched at all) or "Download right away".
-3. **Pages you choose to follow.** After you press "Follow" on the done screen, Fully checks that page every 6 hours while it is running and saves only new images. To stop: Recent → Following → the ✕ on that row. "Check now" checks once by hand.
+3. **Pages you choose to follow.** After you press "Follow" on the done screen, Fully checks that page (or that playlist) every 6 hours while it is running and saves only what's new. To stop: Recent → Following → the ✕ on that row. "Check now" checks once by hand.
+4. **Video engine updates (on by default, can be turned off).** Video sites change often, so once a day Fully asks GitHub in the background whether there is a new version of its video engine (the open-source yt-dlp) and, if so, downloads the official release (after checking the official checksum). Two other cases also reach GitHub: for some video sites the engine downloads an official challenge-solving component, and when a video won't download in a way that looks like the site just changed, Fully retries with the engine's preview build. These only talk to GitHub and send none of your data. Settings → "Keep up with site changes" turns off the daily check.
 
-Apart from these three, Fully makes no network connections: no automatic updates, no analytics, no crash reports, no ads, and nothing sent to us. New versions are posted on the website and in the public repository; download the new DMG to update.
+Apart from these four, Fully makes no network connections: other than the video engine, Fully itself never updates automatically; no analytics, no crash reports, no ads, and nothing sent to us. New versions of Fully are posted on the website and in the public repository; download the new DMG to update.
 
 ### What stays on your Mac
-- **Saved images**: `~/Downloads/Fully` by default, sorted into subfolders by source; you can change the location in Settings. Each file records the address it came from (Finder's "Where from").
+- **Saved images and videos**: `~/Downloads/Fully` by default, sorted into subfolders by source; you can change the location in Settings. Each file records the address it came from (Finder's "Where from").
 - **Recent items, settings and unfinished downloads**: kept in the app's local preferences (Recent keeps 30).
-- **`~/Library/Application Support/Fully/`**: `hash-index.json` remembers which images you already have so the same one isn't saved twice (can be turned off); `follows.json` lists the pages you follow.
+- **`~/Library/Application Support/Fully/`**: `hash-index.json` remembers which images you already have so the same one isn't saved twice (can be turned off); `follows.json` lists the pages you follow; `engines/` holds the video engine and its updates; `archives/` remembers which videos of a followed playlist you already have.
 
 ### Permissions: what macOS asks you, and what Fully touches
 

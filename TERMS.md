@@ -3,21 +3,22 @@
 ## 中文
 
 ### Fully 是什麼
-Fully 是給設計與研究工作用的參考收集工具：貼上一個網頁的網址，把那一頁公開看得到的圖片，以原本的尺寸存到你的 Mac。它做的事和你在瀏覽器裡打開那一頁、存下看得到的圖一樣，只是存的是原尺寸，不是縮圖。
+Fully 是給設計與研究工作用的參考收集工具：貼上一個網址，把那一頁公開看得到的圖片以原本的尺寸、公開看得到的影片以最高畫質存到你的 Mac。它做的事和你在瀏覽器裡打開那一頁、存下看得到的東西一樣，只是存的是原檔，不是縮圖。
 
 ### 你可以用 Fully 做的
-- 存你自己的作品、你自己放到網路上的圖片。
-- 存你已經取得授權，或依法可以使用的圖片。
+- 存你自己的作品、你自己放到網路上的圖片與影片。
+- 存你已經取得授權，或依法可以使用的圖片與影片。
 - 個人學習、研究、做設計參考與內部提案，並且在合理使用的範圍內。
 
 ### 你不可以用 Fully 做的
 1. 重製、散布、公開傳輸或販售你沒有權利的內容。
 2. 存取私人或未公開的內容，或繞過任何存取限制。
-3. 大量、自動化地抓取以致影響網站運作，或以違反該網站使用條款的方式使用。
-4. 任何違反你所在地法律的用途。
+3. 破解或繞過 DRM、加密或其他技術保護措施（Fully 也不會這樣做：受保護的內容它存不下來）。
+4. 大量、自動化地抓取以致影響網站運作，或以違反該網站使用條款的方式使用。
+5. 任何違反你所在地法律的用途。
 
 ### 你的責任
-- 你貼的每一個網址、存下的每一張圖要怎麼用，由你負責；有沒有權利使用，由你判斷。
+- 你貼的每一個網址、存下的每一張圖與每一支影片要怎麼用，由你負責；有沒有權利使用，由你判斷。
 - 各網站的使用條款由你遵守。
 
 ### 我們不做的事
@@ -27,7 +28,7 @@ Fully 是給設計與研究工作用的參考收集工具：貼上一個網頁�
 
 ### 免責聲明
 - Fully 依「現狀」提供，不附任何明示或默示的擔保，包括適售性、特定用途適用性與不侵權；完整條款以授權條款（LICENSE）為準。
-- 網站隨時會改版，Fully 不保證任何網頁都存得到，也不保證存下來的檔案完整。
+- 網站隨時會改版，Fully 不保證任何網頁或影片都存得到，也不保證存下來的檔案完整。
 - 在法律允許的最大範圍內，INTENTION 與所有貢獻者不為你使用 Fully 所造成的任何直接或間接損害負責，包括資料遺失，或第三方對你提出的主張。
 - Fully 與任何網站都沒有關係，也沒有得到任何網站的認可或背書。
 - 本文件不是法律意見。
@@ -43,21 +44,22 @@ Fully 不存放任何內容。如果你認為有人用 Fully 侵害了你的權�
 ## English
 
 ### What Fully is
-Fully is a reference collector for design and research work. Paste the address of a web page and Fully saves the images you can publicly see on it to your Mac, at their original size. It does what you could do in a browser, except it saves the original, not the thumbnail.
+Fully is a reference collector for design and research work. Paste a link and Fully saves the images you can publicly see on that page at their original size, and publicly visible videos at their best quality, to your Mac. It does what you could do in a browser, except it saves the original, not the thumbnail.
 
 ### You may use Fully to
-- Save your own work and images you published yourself.
-- Save images you are licensed to use, or are otherwise permitted to use by law.
+- Save your own work and the images and videos you published yourself.
+- Save images and videos you are licensed to use, or are otherwise permitted to use by law.
 - Study, research, collect design references and prepare internal pitches, within fair use.
 
 ### You may not use Fully to
 1. Copy, distribute, publicly transmit or sell content you do not have the rights to.
 2. Access private or unpublished content, or get around any access restriction.
-3. Scrape at a volume that disrupts a website, or use a website in breach of its terms.
-4. Do anything that breaks the law where you live.
+3. Break or get around DRM, encryption or any other technical protection measure (Fully doesn't do this either: it can't save protected content).
+4. Scrape at a volume that disrupts a website, or use a website in breach of its terms.
+5. Do anything that breaks the law where you live.
 
 ### Your responsibility
-- You are responsible for every link you paste and every image you save, and for judging whether you have the right to use it.
+- You are responsible for every link you paste and every image and video you save, and for judging whether you have the right to use it.
 - You are responsible for following each website's terms.
 
 ### What we don't do
@@ -67,7 +69,7 @@ Fully is a reference collector for design and research work. Paste the address o
 
 ### Disclaimer
 - Fully is provided "as is", without warranty of any kind, express or implied, including merchantability, fitness for a particular purpose and non-infringement. The license (`LICENSE`) governs.
-- Websites change. Fully does not guarantee that any page can be saved or that any file will be complete.
+- Websites change. Fully does not guarantee that any page or video can be saved or that any file will be complete.
 - To the maximum extent permitted by law, INTENTION and all contributors are not liable for any direct or indirect damage arising from your use of Fully, including data loss or third-party claims against you.
 - Fully is not affiliated with, endorsed or sponsored by any website.
 - This document is not legal advice.

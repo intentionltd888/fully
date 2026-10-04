@@ -101,6 +101,9 @@ final class ClipCard: NSObject, WKScriptMessageHandler {
         if let l = p["label"] as? String, !l.isEmpty { d["label"] = l }
         if let t = p["thumb"] as? String, t.hasPrefix("http") { d["thumb"] = t }
         d["meta"] = Self.metaLine(p)
+        if p["not_public"] as? Bool == true {
+            d["meta"] = L("這不是公開的內容", "This isn't public")
+        }
         set(d)
     }
 
@@ -152,6 +155,7 @@ final class ClipCard: NSObject, WKScriptMessageHandler {
     static func metaLine(_ p: [String: Any]) -> String {
         var bits: [String] = []
         let count = p["count"] as? Int ?? 0
+        if let v = videoMeta(p, count: count) { return v }     // 影片／清單：長度、幾支、最高畫質
         if count > 1 {
             bits.append(L("\(count) 張", "\(count) images"))
         }
@@ -162,6 +166,24 @@ final class ClipCard: NSObject, WKScriptMessageHandler {
         return bits.joined(separator: "・")
     }
 
+    /// 影片線：清單＝幾支、單支＝長度；有畫面尺寸就講最高畫質。不是影片回 nil（走圖片那套）
+    private static func videoMeta(_ p: [String: Any], count: Int) -> String? {
+        let dur = p["duration"] as? Double ?? (p["duration"] as? Int).map(Double.init)
+        let isList = p["list"] as? Bool == true
+        guard isList || (dur ?? 0) > 0 || p["fps"] != nil else { return nil }
+        var bits: [String] = []
+        if isList, count > 0 {
+            bits.append(L("\(count) 支", "\(count) videos"))
+        } else if let d = dur, d > 0 {
+            let s = Int(d)
+            bits.append(s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s % 3600 / 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60))
+        }
+        if let w = p["w"] as? Int, let h = p["h"] as? Int, w > 0, h > 0 {
+            let fps = p["fps"] as? Int ?? 0
+            bits.append(L("最高 ", "up to ") + "\(min(w, h))p" + (fps > 30 ? "\(fps)" : "") + ((p["hdr"] as? Bool == true) ? " HDR" : ""))
+        }
+        return bits.isEmpty ? nil : bits.joined(separator: "・")
+    }
 
     // MARK: 內部
 

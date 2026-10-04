@@ -11,9 +11,28 @@ Hover Zoom+（縮圖→原圖網址規則的參考來源）— MIT License
   https://github.com/extesy/hoverzoom ・grab.py 的 CDN_RULES 有部分規則翻譯自其 plugins/。
   Copyright (c) Hover Zoom+ contributors.
 
-QuickJS-ng 0.16.1（qjs，離線執行 maxurl 規則庫的 JavaScript 執行環境）— MIT License
+QuickJS-ng 0.16.1（qjs，離線執行 maxurl 規則庫的 JavaScript 執行環境；也給 yt-dlp 解網站的 JavaScript 挑戰）— MIT License
   https://github.com/quickjs-ng/quickjs ・自 v0.16.1 原始碼以 macOS 11 為最低目標自行編譯（arm64）。
   Copyright (c) 2017-2021 Fabrice Bellard and Charlie Gordon; (c) 2023-2025 QuickJS-ng contributors.
+
+yt-dlp 2026.08.19（Resources/bin/yt-dlp，影片引擎）— Unlicense；隨附的執行檔整體為 GPLv3+
+  https://github.com/yt-dlp/yt-dlp ・使用官方發行的 yt-dlp_macos 單檔，未經修改
+  （SHA-256 0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202）。
+  yt-dlp 本身以 Unlicense 釋出；依官方說明，PyInstaller 打包的執行檔含 GPLv3+ 授權的程式碼，整體以 GPLv3+ 授權。
+  對應原始碼：https://github.com/yt-dlp/yt-dlp/tree/2026.08.19
+  各相依套件的授權：https://github.com/yt-dlp/yt-dlp/blob/2026.08.19/THIRD_PARTY_LICENSES.txt
+  GPL v3 全文：https://www.gnu.org/licenses/gpl-3.0.html
+  Fully 裝好後會每天向 GitHub 上的官方發行版更新這支執行檔（設定裡可以關）；更新下來的版本來源相同、授權相同。
+
+FFmpeg 9.0（Resources/bin/ffmpeg、ffprobe，靜態組建：合併影音、轉成 QuickTime 能播的格式、截圖）— GPL v3
+  https://ffmpeg.org ・使用 https://ffmpeg.martin-riedl.de 的 macOS arm64 組建（編號 1785863997_9.0），未經修改。
+  這個組建以 --enable-gpl --enable-version3 編譯（含 x264、x265 等 GPL 函式庫），整體以 GPL v3 授權。
+  對應原始碼：FFmpeg 9.0 https://ffmpeg.org/releases/ffmpeg-9.0.tar.xz
+  組建腳本：https://git.martin-riedl.de/ffmpeg/build-script
+  這個組建用到的各函式庫與版本：https://ffmpeg.martin-riedl.de/info/detail/macos/arm64/1785863997_9.0
+  GPL v3 全文：https://www.gnu.org/licenses/gpl-3.0.html
+
+yt-dlp 與 FFmpeg 都是獨立的執行檔，Fully 以子程序呼叫它們（聚合，不連結），Fully 其餘的程式碼照舊以 MIT 授權。
 
 ────────────────────────────────────────────────────────────
 Uiverse.io elements (interface styling) — MIT License

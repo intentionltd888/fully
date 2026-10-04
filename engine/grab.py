@@ -5,6 +5,8 @@ grab — 貼一個網址，抓下它的「完整版」而不是頁面上的縮�
 
 任何網頁：掃出頁面上公開看得到的圖，一張張換成原始尺寸（建站平台與圖片 CDN 的規則＋maxurl），
 同時下載、同一張不存兩次。共用底層在 core.py（`import core as pg`）。
+影片與圖版：經由擴充（EXT）掛進來——影片線（video.py）認得的影片網址直接交給它，網頁掃不到圖時也問它；
+圖版與單張 pin 交給圖版解析（pin_grab.py）。
 
 --json：一行一個事件給 app 的介面層吃。不加就是給人看的純文字。
 旗標：--probe（只看不抓）--items（連每一項都列）--pick ID,ID --list 檔 --sub --baseline
@@ -24,6 +26,7 @@ import core as pg
 from core import (T, OPT, CUR, BUNDLED_BIN, _host, site_label, picked, img_done, width_hint,
                   sheet_for_images, tag_where_from, _ensure_ca_certs)
 
+import media as EXT        # 影片線與圖版解析（靜態 import 才會被 PyInstaller 收進去）
 try:                      # maxurl（Apache-2.0）的 1 萬多站縮圖→原圖規則，由包內 qjs 離線執行
     import maxurl as MAXURL
 except Exception:
@@ -36,6 +39,10 @@ IMG_EXT = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".bmp", ".tiff", "
 # ─── 來源判斷 ────────────────────────────────────────────────────────
 
 def kind_of(url):
+    if EXT:
+        k = EXT.kind_of(url)
+        if k:
+            return k
     return "web"
 
 
@@ -362,6 +369,9 @@ def _scan_page(url, sess):
 def grab_web(url, dest, sess):
     final_url, page, rows, name, preview_only = _scan_page(url, sess)
 
+    # 頁面掃不到半張圖、或只拿得到分享預覽圖（影片頁多半如此）：擴充（影片線）認得就交給它
+    if (not rows or preview_only) and EXT and EXT.web_fallback(final_url, dest):
+        return
     if not rows:
         pg.die(T("這個網頁上抓不到圖片。有些網站的圖要捲動才載入，或不是公開的。",
                  "No images found on this page. Some sites only load images as you scroll, or aren't public."))
@@ -423,15 +433,19 @@ def grab_list(listfile, dest):
 # ─── 預覽（--probe）：只看不抓 ───────────────────────────────────────────
 
 def _session():
+    if EXT:
+        return EXT.session()
     return pg.Session()
 
 
 def _probe_web(url):
     sess = _session()
-    final_url, page, rows, name, _ = _scan_page(url, sess)
+    final_url, page, rows, name, preview_only = _scan_page(url, sess)
     og = re.search(r'<meta[^>]+(?:property|name)=["\']og:image(?::url)?["\'][^>]+content=["\']([^"\']+)["\']', page or "", re.I)
     thumb = urllib.parse.urljoin(final_url, htmllib.unescape(og.group(1))) if og else (rows[0]["thumb"] if rows else None)
     out = {"name": name, "count": min(len(rows), WEB_CAP), "thumb": thumb}
+    if preview_only:
+        out["preview_only"] = True
     if OPT["items"]:
         out["items"] = [{"id": r["id"], "thumb": r["thumb"], "title": ""} for r in rows[:WEB_CAP]]
     return out
@@ -443,8 +457,12 @@ def probe_source(url):
     out = {"type": "preview", "url": url, "kind": kind, "label": site_label(url)}
     try:
         p = None
+        if EXT and kind != "web":
+            p = EXT.probe(kind, url)
         if p is None:
             p = _probe_web(url)
+            if (not p.get("count") or p.get("preview_only")) and EXT:
+                p = EXT.probe_fallback(url) or p
         out.update(p)
     except SystemExit:
         raise
@@ -462,6 +480,9 @@ def main():
     # 旗標：--pick ID,ID　--list 檔 帶值；其餘是開關
     SWITCHES = {"--json", "--probe", "--items", "--sub", "--baseline"}
     VALUED = {"--pick": "pick", "--list": "list"}
+    if EXT:                                  # 擴充另外加它自己的
+        SWITCHES |= EXT.SWITCHES
+        VALUED.update(EXT.VALUED)
     argv, flags, vals, a = [], set(), {}, sys.argv[1:]
     i = 0
     while i < len(a):
@@ -477,6 +498,9 @@ def main():
     pg.JSON_MODE = "--json" in flags
     OPT.update(pick=vals.get("pick"), sub="--sub" in flags, baseline="--baseline" in flags, items="--items" in flags)
     no_images = False                                # 這一趟不存圖：不做重複比對、不出總覽圖
+    if EXT:
+        EXT.take_flags(flags, vals)
+        no_images = EXT.media_only()
 
     if vals.get("list"):
         dest = argv[0] if argv else os.path.expanduser("~/Downloads")
@@ -547,11 +571,15 @@ def baseline(url, dest):
     """開始追蹤：把來源現有的每一項記成「看過了」，之後的檢查只抓新的。
     網頁不用做事——檢查時比對資料夾裡已經有的檔（.fully-seen）。"""
     n = 0
+    if EXT:
+        n = EXT.baseline(url)
     pg.emit(type="done", added=0, skipped=n, failed=0, folder="", headline="", baseline=True)
 
 
 def _dispatch(url, dest, kind):
     sess = _session()
+    if EXT and EXT.dispatch(url, dest, kind, sess):
+        return
     grab_web(url, dest, sess)
 
 

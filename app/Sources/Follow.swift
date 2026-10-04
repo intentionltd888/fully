@@ -17,6 +17,7 @@ struct Follow: Codable, Equatable {
     var lastCheck: Date?
     var lastNew: Int = 0
     var totalNew: Int = 0
+    var archive: String?        // 影片清單的下載紀錄檔
     var lastError: String?
 }
 
@@ -72,8 +73,15 @@ final class Follows {
     /// 開始追蹤：資料夾裡已經有的就是「看過了」的底，之後只抓新的
     func add(url: String, name: String, kind: String, mode: String, root: String) {
         guard !isFollowing(url) else { return }
-        let f = Follow(id: UUID().uuidString, url: url, name: name, kind: kind, mode: mode, root: root,
+        var f = Follow(id: UUID().uuidString, url: url, name: name, kind: kind, mode: mode, root: root,
                        added: Date(), lastCheck: Date())
+        // 影片清單先做「看過了」的底（只列清單不下載，幾秒）
+        if kind == "video" {
+            let dir = EngineRunner.dataDir + "/archives"
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            f.archive = dir + "/\(f.id).txt"
+            EngineRunner.start(["--json", "--baseline", "--archive", f.archive!, url, root], onEvent: { _ in }, onExit: { _ in })
+        }
         items.insert(f, at: 0)
         save()
     }
@@ -131,6 +139,8 @@ final class Follows {
     private func check(_ f: Follow, done: @escaping (Int, String?) -> Void) {
         let run: ([String]) -> Void = { extra in
             var tail = ["--json", "--sub"] + extra
+            if f.mode == "audio" { tail.append("--audio") }
+            if let a = f.archive { tail += ["--archive", a] }
             tail += [f.url, f.root]
             var added = 0, err: String?
             let started = EngineRunner.start(tail, onEvent: { ev in

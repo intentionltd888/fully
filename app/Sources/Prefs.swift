@@ -89,7 +89,7 @@ enum EngineRunner {
     }()
 
     static var environment: [String: String] {
-        var env = ProcessInfo.processInfo.environment
+        var env = EngineManager.shared.environment      // 影片引擎：yt-dlp 自更新的那一份（Engines.swift）
         env["FULLY_LANG"] = Lang.code
         env["FULLY_DATA_DIR"] = dataDir
         env["FULLY_DEDUP"] = Prefs.dedup ? "1" : "0"

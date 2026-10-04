@@ -192,9 +192,10 @@ def existing_ids(folder):
     return ids
 
 
-def fetch_bytes(url, referer=None):
+def fetch_bytes(url, referer=None, video=False):
     """抓下來先驗證再落地，避免留下寫壞的半截檔（本工具不做任何刪檔）。
-    referer：網頁掃圖帶原頁網址（有些 CDN 擋沒有來源頁的請求）；沒給就不帶。"""
+    referer：網頁掃圖帶原頁網址（有些 CDN 擋沒有來源頁的請求）；沒給就不帶。
+    video：來源模組說這一筆是影片檔（例如圖版裡的影片 pin）——驗的是 mp4／mov 的檔頭，不是圖片的。"""
     headers = {"User-Agent": ua_for(url)}
     if referer:
         headers["Referer"] = iri(referer)
@@ -203,7 +204,11 @@ def fetch_bytes(url, referer=None):
     def once():
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
             return resp.read()
-    blob = with_retry(once, "下載圖片")
+    blob = with_retry(once, "下載影片" if video else "下載圖片")
+    if video:
+        if not is_mp4(blob):
+            raise ValueError(T("不是影片檔", "not a video"))
+        return blob
     if len(blob) < 1024 and b"<svg" not in blob[:1024].lower():
         raise ValueError(T("回應太小，應該是錯誤頁", "response too small (error page?)"))
     # AVIF/HEIC 的魔數在第 4–12 位元組（ftyp box）——有些 CDN 只給 avif，
@@ -215,6 +220,39 @@ def fetch_bytes(url, referer=None):
             or is_isobmff or is_svg(blob)):
         raise ValueError(T("不是圖片檔", "not an image"))
     return blob
+
+
+def is_mp4(b):
+    """mp4／mov：第一個 box 的型別在第 4–8 位元組（ftyp，少數舊檔直接是 moov／mdat／free／wide）。"""
+    return len(b) > 1024 and b[4:8] in (b"ftyp", b"moov", b"mdat", b"free", b"wide", b"skip")
+
+
+def fetch_hls(url, referer=None):
+    """串流（m3u8）→ 一支 mp4：交給 yt-dlp（它自己的串流下載器把每一段都抓齊，再用 ffmpeg 在本機合併）。
+    不讓 ffmpeg 直接開網路串流：只抓到第一段也會回「成功」（實測 8 秒的影片只剩 2 秒），等於靜靜交出半截檔。
+    寫進系統暫存區、驗過檔頭才交回去；回 (位元組, 暫存檔)，下載端用搬的放進資料夾，不留第二份。"""
+    import glob
+    import subprocess
+    import tempfile
+    import video
+    yt, ff = video.find_ytdlp(), find_ffmpeg_dir()
+    if not yt or not ff:
+        raise ValueError(T("少了影片引擎，接不起串流影片", "The video engine is missing — can't join a streamed video"))
+    d = tempfile.mkdtemp(prefix="fully-stream-")
+    cmd = yt + ["--no-warnings", "--quiet", "--no-progress", "--no-playlist", "--ffmpeg-location", ff,
+                "-f", "bv*+ba/b", "--merge-output-format", "mp4", "-o", os.path.join(d, "v.%(ext)s")]
+    if referer:
+        cmd += ["--referer", iri(referer)]
+    r = subprocess.run(cmd + [url], capture_output=True, text=True, timeout=900)
+    out = [p for p in glob.glob(os.path.join(d, "v.*")) if not p.endswith((".part", ".ytdl"))]
+    if r.returncode != 0 or not out:
+        last = (r.stderr or "").strip().splitlines()
+        raise ValueError(last[-1][:60] if last else T("串流影片接不起來", "couldn't join the streamed video"))
+    with open(out[0], "rb") as fh:
+        blob = fh.read()
+    if not is_mp4(blob):
+        raise ValueError(T("不是影片檔", "not a video"))
+    return blob, out[0]
 
 
 def is_svg(b):
@@ -495,6 +533,7 @@ class DLResult:
 
     def __init__(self):
         self.ok = self.skipped = self.failed = self.dups = self.small = 0
+        self.videos = 0             # 存下來的裡面有幾支是影片（圖版裡的影片 pin）
         self.files, self.best, self.dup_of, self.page_w = [], (0, 0), None, None
         self.best_file = None       # 最大那張的路徑：一整批的縮圖用它（第一張常是地圖、標誌）
 
@@ -528,19 +567,23 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
         rid = str(r["id"])
         if rid in have or (only_new and seen is not None and rid in seen.ids):
             return "skip", None
-        blob = used = None
+        blob = used = src_file = None
         last = None
+        vid = bool(r.get("video"))
         for cand in [r["url"]] + list(r.get("alts") or []):
             try:
                 with host_sem(cand):
-                    blob = fetch_bytes(cand, r.get("referer"))
+                    if vid and r.get("hls") and cand == r["url"]:
+                        blob, src_file = fetch_hls(cand, r.get("referer"))
+                    else:
+                        blob = fetch_bytes(cand, r.get("referer"), video=vid)
                 used = cand
                 break
             except Exception as e:
                 last = e
         if blob is None:
             return "bad", str(last)[:60]
-        if min_bytes and len(blob) < min_bytes:
+        if min_bytes and not vid and len(blob) < min_bytes:
             # 檔案小不一定是圖示：有些原圖本來就只有 400 px、13 KB（Wikimedia 上的老照片）——量得到而且夠大就照存
             sw, sh = image_size(blob)
             if not (sw and sh and max(sw, sh) >= 400 and min(sw, sh) >= 200):
@@ -553,20 +596,30 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
                     seen.add(rid)
                 return "dup", prior
         ext = os.path.splitext(urllib.parse.urlparse(used).path)[1].lower()
-        if ext not in IMAGE_EXTS:
+        if vid:
+            ext = ext if ext in (".mp4", ".mov", ".m4v") else ".mp4"
+        elif ext not in IMAGE_EXTS:
             ext = sniff_ext(blob)
         slug = safe_name(r.get("title") or "")
         stem = f"{i:03d}_{slug}_{rid}" if slug else f"{i:03d}_{rid}"
         path = os.path.join(folder, stem + ext)
         try:
-            with open(path, "wb") as fh:
-                fh.write(blob)
+            moved = False
+            if src_file:                            # 串流影片在暫存區已經是一個完整的檔：搬過去，不留第二份
+                try:
+                    os.replace(src_file, path)
+                    moved = True
+                except OSError:
+                    pass
+            if not moved:
+                with open(path, "wb") as fh:
+                    fh.write(blob)
         except OSError as e:
             if e.errno == 28:                       # ENOSPC：磁碟滿了，其他條也別再試
                 stop.set()
                 return "nospace", None
             return "bad", str(e)[:60]
-        w, h = image_size(blob)
+        w, h = (None, None) if vid else image_size(blob)
         if not w:
             w, h = r.get("w"), r.get("h")
         if dedup is not None:
@@ -587,6 +640,7 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
             if kind == "ok":
                 path, w, h, size, r = info
                 res.ok += 1
+                res.videos += 1 if r.get("video") else 0
                 res.files.append(path)
                 if w and h and w * h > res.best[0] * res.best[1]:
                     res.best = (w, h)
@@ -664,6 +718,8 @@ def img_done(res):
     w／h／dims＝這批存下來最大的那張（量檔頭，不是網站說的）；page_w＝那張在原頁面上的顯示寬（知道才給）；
     dups＝一模一樣早就存過、這次沒再存的張數；單張時 file＝那個檔（完成畫面縮圖、剪貼簿、拖出都用它）。"""
     d = {"dups": res.dups, "small": res.small}
+    if res.videos:
+        d["videos"] = res.videos        # 一批裡有幾支是影片（完成畫面另外講）
     if res.best[0]:
         d.update(w=res.best[0], h=res.best[1], dims=f"{res.best[0]}×{res.best[1]}")
         if res.page_w:
@@ -818,8 +874,15 @@ def _ensure_ca_certs():
     獨立執行檔內的 OpenSSL 認的是編譯時寫死的憑證路徑；目前 python-build-standalone
     指向 /etc/ssl/cert.pem（每台 macOS 系統自帶，不靠 CLT／Homebrew，實測載到 128 張根憑證）。
     萬一哪天預設路徑載不到任何 CA，就退兩級：先指系統那份 cert.pem，再不然從系統鑰匙圈
-    匯出根憑證。SSL_CERT_FILE 對之後建立的每個 context 都生效（含 urllib 隱含建的）。"""
+    匯出根憑證。SSL_CERT_FILE 對之後建立的每個 context 都生效（含 urllib 隱含建的）。
+    子程序也吃這個環境變數：包內的 ffmpeg 是靜態組建，它自己的 OpenSSL 認的是組建機上的路徑，
+    在使用者的 Mac 上一張根憑證都載不到（「certificate verify failed」）——所以一律把系統那份指給它
+    （使用者自己設過 SSL_CERT_FILE 就不動）。"""
     import ssl
+    for cafile in ("/etc/ssl/cert.pem", "/private/etc/ssl/cert.pem"):
+        if os.path.exists(cafile):
+            os.environ.setdefault("SSL_CERT_FILE", cafile)
+            break
     try:
         if ssl.create_default_context().cert_store_stats().get("x509_ca", 0) > 0:
             return

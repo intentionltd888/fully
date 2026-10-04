@@ -11,16 +11,23 @@ TARGET="${1:-build/Fully.app}"
 ME=$(id -un); HOST=$(scutil --get LocalHostName 2>/dev/null || hostname -s)
 # /tmp 底下的中性建置路徑不算——裡面沒有帳號名；帳號名與主機名另外比對
 PAT="/Users/[A-Za-z0-9._-]+/|-Users-[A-Za-z0-9]|/var/folders/"
-[ "${#ME}" -ge 3 ] && PAT="$PAT|$ME"
-[ "${#HOST}" -ge 3 ] && PAT="$PAT|$HOST"
+OURS=""
+[ "${#ME}" -ge 3 ] && OURS="$ME"
+[ "${#HOST}" -ge 3 ] && OURS="${OURS:+$OURS|}$HOST"
+[ -n "$OURS" ] && PAT="$PAT|$OURS"
+# 第三方的官方組建（vendor-fetch.sh 釘版、逐位元組核對過）：裡面有它們自己組建機的路徑（例如 /Users/buildserver/…），
+# 那不是我們的痕跡——這幾支只比對這台機器的帳號名與主機名
+THIRD_PARTY="Contents/Resources/bin/yt-dlp Contents/Resources/bin/ffmpeg Contents/Resources/bin/ffprobe"
 FAIL=0; N=0
 while IFS= read -r f; do
   N=$((N+1))
-  c=$(LC_ALL=C grep -acE "$PAT" "$f" 2>/dev/null || true)
+  p="$PAT"
+  case " $THIRD_PARTY " in *" ${f#$TARGET/} "*) p="${OURS:-x^}" ;; esac
+  c=$(LC_ALL=C grep -acE "$p" "$f" 2>/dev/null || true)
   [ "${c:-0}" -gt 0 ] || continue
   FAIL=1
   echo "✗ ${f#$TARGET/}（$c 處）"
-  LC_ALL=C grep -aoE "[ -~]{0,24}($PAT)[ -~]{0,60}" "$f" 2>/dev/null | sort -u | head -3 | sed 's/^/     /'
+  LC_ALL=C grep -aoE "[ -~]{0,24}($p)[ -~]{0,60}" "$f" 2>/dev/null | sort -u | head -3 | sed 's/^/     /'
 done < <(find "$TARGET" -type f)
 if [ "$FAIL" = "0" ]; then echo "✅ 成品乾淨（$N 檔，沒有建置機的路徑、帳號名、主機名）"; exit 0; fi
 echo "❌ 成品帶著建置機的痕跡——查是誰把絕對路徑寫進字串，或換到中性的路徑重編"; exit 1

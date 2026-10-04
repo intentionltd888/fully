@@ -1,5 +1,5 @@
 #!/bin/bash
-# freeze.sh — 把 grab.py（連同 core.py、maxurl.py）凍成單一獨立執行檔 fully-engine
+# freeze.sh — 把 grab.py（連同 core.py、maxurl.py，以及影片線 video.py、圖版解析 pin_grab.py）凍成單一獨立執行檔 fully-engine
 #
 # 為什麼：/usr/bin/python3 在沒裝 Xcode 命令列工具的 Mac 上只是個「要不要安裝開發者工具？」的空殼，
 # 引擎一啟動就死。所以引擎凍成 PyInstaller 單檔＋Developer ID 簽章（app/bin.entitlements）＋公證，

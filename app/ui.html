@@ -11,6 +11,7 @@
        結果＝多一行「拿到多大」（凹的膠囊：尺寸＋頁面上那張的幾倍）；單張圖原圖直接進剪貼簿
        完成的縮圖、最近抓的可以直接拖出去；最近抓的頁有一個分頁「追蹤中」
        中文／English：data-i18n 的元素整塊換、JS 裡的句子走 tr()
+     影片與圖版的畫面在 ui-media.js（兩版共用），透過 window.FullyExt 的鉤子掛上；ui.html 本身只認得圖片。
 
      造型來源（不發明；三顆都是 Uiverse.io／MIT，署名在 THIRD-PARTY-NOTICES）：
        R1 adamgiebl／strong-zebra-87      大圓角凸起板、寬柔雙向影      ＝可以按：主鍵待命、網址卡、主要動作鍵
@@ -318,6 +319,7 @@
 
   <section class="zone" id="zone">
     <div class="t-display" id="state"></div>
+    <div id="extAsk"></div>
     <div class="t-body one hide" id="nameLine"></div>
     <div class="t-body" id="sub"></div>
     <button class="link hide" id="pickLink"></button>
@@ -360,6 +362,7 @@
       <span class="seg" id="clipSeg"><button data-clip="card" data-i18n>問我</button><button data-clip="auto" data-i18n>直接抓</button><button data-clip="off" data-i18n>不動</button></span></div>
     <button class="row" id="copyRow"><div class="l"><div class="t-body" data-i18n>單張圖抓完放進剪貼簿</div><div class="t-cap" data-i18n>⌘V 就能貼進 Figma、Keynote</div></div><span class="sw" id="copySw"><i></i></span></button>
     <button class="row" id="dedupRow"><div class="l"><div class="t-body" data-i18n>同一張不存兩次</div><div class="t-cap" data-i18n>比對存放資料夾裡已經有的圖</div></div><span class="sw" id="dedupSw"><i></i></span></button>
+    <div id="extSettings"></div>
     <div class="row col"><div class="l"><div class="t-body" data-i18n>從瀏覽器一鍵送進 Fully</div><div class="t-cap" data-i18n>把這顆拖到書籤列。在任何網頁按一下，就交給 Fully。</div></div>
       <span class="wrow" style="margin-top:0"><a class="bm" id="bookmarklet" href="#" draggable="true"><svg viewBox="0 0 10 10"><path d="M7 0h3v10H7ZM0 7h10v3H0ZM4 7L7 7A7 7 0 0 0 0 0L0 3A4 4 0 0 1 4 7Z"/></svg><span data-i18n>抓進 Fully</span></a><button class="link" id="bmCopy" data-i18n>拷貝這段</button></span></div>
     <div class="row"><div class="l"><div class="t-body" data-i18n>外觀</div></div><span class="seg" id="seg"><button data-theme="system" data-i18n>跟系統</button><button data-theme="light" data-i18n>淺色</button><button data-theme="dark" data-i18n>深色</button></span></div>
@@ -478,7 +481,7 @@
     '不到 1 分鐘': 'under a minute', '大約還要 {n} 分鐘': 'about {n} min left', '，': ', ',
     '{a}／{b} 張': '{a} / {b}', '{n} 張': '{n}', '邊讀邊抓，抓的是原始尺寸。': 'Saving as it reads — at original size.',
     '存好了': 'Saved', '之前就抓過了': 'Already saved', '早就有了': 'Already saved', '沒有夠大的圖': 'No big images', '這次沒抓到': 'Nothing came through',
-    '只有預覽圖': 'Preview image only', '這一頁本身讀不到圖，只存到分享連結時顯示的那張預覽圖，放在「{w}」。': "Couldn't read any images from the page itself — saved only the preview image shown when the link is shared, in “{w}”.",
+    '只有預覽圖': 'Preview image only', '其中 {n} 支是影片。': '{n} of them are videos.', '這一頁本身讀不到圖，只存到分享連結時顯示的那張預覽圖，放在「{w}」。': "Couldn't read any images from the page itself — saved only the preview image shown when the link is shared, in “{w}”.",
     '這一頁的圖都太小（像圖示、按鈕），沒有存。': 'Everything on this page was tiny (icons, buttons) — nothing saved.',
     '{n} {u}，放在「{w}」。': '{n} {u} in “{w}”.', '放在「{w}」。': 'In “{w}”.', '全部 {n} {u}都已經在「{w}」裡。': 'All {n} {u} are already in “{w}”.',
     '另外 {n} {u}略過（抓過或太小）': '{n} {u} skipped (already there or too small)', '{n} {u}抓不到': "{n} {u} couldn't be grabbed",
@@ -505,6 +508,7 @@
   };
   const tr = (s, v) => { let o = (LANG === 'en' && EN[s] !== undefined) ? EN[s] : s;
     if (v) o = o.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? ''); return o; };
+  window.FullyTr = { EN, tr, lang: () => LANG };      // ui-media.js 也用這套
   function translate() {
     document.querySelectorAll('[data-i18n]').forEach(el => {
       if (el.dataset.zh === undefined) el.dataset.zh = el.innerHTML.trim();
@@ -524,6 +528,10 @@
 
   let iconFor = k => ICON.img;                          // 網址卡的小圖示
   let histIconFor = it => ICON.img;                     // 最近抓的每一列的小圖示
+  // 擴充掛上的東西（ui-media.js：影片與圖版）
+  const X = () => window.FullyExt || null;
+  iconFor = k => X()?.icon?.(k) || ICON.img;
+  histIconFor = it => X()?.histIcon?.(it) || ICON.img;
 
   let mode = 'idle';                 // idle／run／done／err
   let kind = 'none', srcLabel = '', total = 0, evKind = '', curName = '';
@@ -539,6 +547,8 @@
   let toastT = 0;
   const toast = t => { $('toast').textContent = t; $('toast').classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => $('toast').classList.remove('on'), 4000); };
   let withMode = (d, k) => d;                           // 開抓時帶給 Swift 的參數
+  window.FullyUI = { send, toast, tr, esc, $, paint: () => paint(), setText: (a, b) => setText(a, b), running: (w, f) => running(w, f) };
+  withMode = (d, k) => { const m = X()?.startMode?.(k); return m ? { ...d, mode: m } : d; };   // 影片有自己的 mode（只要聲音…）
 
   // ── 來源判斷：網址卡上寫網域 ──
   const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
@@ -548,6 +558,8 @@
     const urls = urlsNow();
     if (!urls.length) { kind = 'none'; srcLabel = ''; return; }
     srcLabel = hostOf(urls[0]) || tr('網頁'); kind = 'image';
+    const ext = X()?.classify?.(urls[0]);
+    if (ext) { srcLabel = ext.label || srcLabel; kind = ext.kind || kind; }
   }
 
   // ── 預覽：網址一帶進來就請 Swift 看一眼（引擎 --probe），回來填進網址卡 ──
@@ -561,6 +573,7 @@
     probeT = setTimeout(() => send('probe', { url: urls[0] }), 250);
   }
   function metaLine(p) {
+    const ext = X()?.metaLine?.(p); if (ext) return ext;     // 影片有它自己的一行（長度、最高畫質）
     const bits = [];
     const n = p.count || 0;
     if (n > 1) bits.push(tr('{n} 張', { n }));
@@ -588,6 +601,7 @@
   function paint() {
     const urls = urlsNow(), has = urls.length > 0;
     let view = mode !== 'idle' ? mode : (!has ? 'empty' : 'image');
+    if (view === 'image') view = X()?.view?.(kind) || view;
     document.body.dataset.state = mode; document.body.dataset.v = view;
     const showCard = has || mode === 'run' || mode === 'done';
     $('what').className = 'what ' + (showCard ? 'card' : 'slot');
@@ -603,6 +617,10 @@
     $('orbLabel').textContent = o === 'retry' ? tr('再試一次') : o === 'done' ? '' : tr('下載');
     $('orbBtn').setAttribute('aria-label', o === 'run' ? tr('停止') : o === 'retry' ? tr('再試一次') : tr('下載'));
     $('clearBtn').setAttribute('aria-label', tr('清掉這個網址'));
+    const ask = X()?.askVisible?.(view) || false;
+    $('extAsk').classList.toggle('hide', !ask);
+    $('state').classList.toggle('hide', ask);
+    $('sub').classList.toggle('hide', ask);
     $('nameLine').classList.add('hide');           // 名稱在網址卡上，完成畫面不重複（高度留給「拿到多大」）
     $('acts').classList.toggle('hide', view !== 'done');
     $('proof').classList.toggle('hide', view !== 'done' || !$('proofDims').textContent);
@@ -613,10 +631,12 @@
     if (view !== 'done' && view !== 'err') $('fails').classList.add('hide');
     if (view === 'empty') {
       let s = null;
+      s = X()?.emptySub?.(prefs.clip);
       setText(tr('先複製一個網址'), s || (prefs.clip === 'card' ? tr('在任何網頁複製網址，右上角會跳出預覽卡；<br>或回到這裡，網址會自己出現。')
         : prefs.clip === 'auto' ? tr('直接抓開著：在任何地方複製網址，<br>Fully 會自己開始抓。') : tr('到任何網頁把網址複製起來，<br>再回到這裡，它會自己出現。')));
     }
     if (view === 'image') setText(tr('可以下載了'), tr('按中間那顆開始。<br>抓的是原始大圖，不是頁面上的縮圖。'));
+    X()?.paint?.(view);
   }
   function onInput() { classify(); if (mode !== 'run') { mode = 'idle'; resolving(false); } paint(); askPreview(); }
   $('url').addEventListener('input', onInput);
@@ -709,10 +729,12 @@
 
   // ── Swift → JS ────────────────────────────────────────────────
   window.appEvent = ev => {
+    if (X()?.onEvent?.(ev) === true) return;          // 擴充先看它自己的事件，回 true＝它處理完了
     switch (ev.type) {
       case 'hello': {
         LANG = ev.lang === 'en' ? 'en' : 'zh';
         translate();
+        X()?.translate?.();
         classify(); paint(); wizGo(wizIdx); renderHistory(); renderFollows(false);
         break;
       }
@@ -744,6 +766,7 @@
       case 'wizard':
         if (ev.show) {
           $('wiz').classList.remove('hide'); agreed = !!ev.agreed; $('agree').classList.toggle('on', agreed); wizGo(ev.page || 0);
+          X()?.onWizard?.(ev);
         }
         else { $('wiz').classList.add('hide'); $('url').focus(); }
         break;
@@ -776,6 +799,7 @@
         $('cardIcon').querySelectorAll('svg').forEach(s => s.remove());
         $('cardIcon').insertAdjacentHTML('afterbegin', iconFor(evKind));
         $('cardTitle').textContent = curName || ev.label || ''; $('cardUrl').textContent = ev.label || ''; $('cardUrl').classList.remove('url');
+        if (X()?.onSource?.(ev) === true) break;   // 影片自己擺進度
         if (total > 0) { setText(tr('{a}／{b} 張', { a: 0, b: total })); running(tr('下載中'), 0); }
         else { setText(tr('{n} 張', { n: 0 })); $('sub').innerHTML = tr('邊讀邊抓，抓的是原始尺寸。'); resolving(true); }
         break;
@@ -786,6 +810,7 @@
         break;
       case 'progress': {
         let what = tr('下載中');
+        what = X()?.stageText?.(ev.stage || '') || what;
         setText(`${ev.percent}%`); prog(ev.percent / 100); running(what, ev.percent / 100);
         break;
       }
@@ -828,6 +853,8 @@
     $('url').value = ''; classify(); previewFor = '';             // 抓完清空，下一個網址才進得來
     const n = ev.added || 0, sk = ev.skipped || 0, fl = ev.failed || 0, du = ev.dups || 0;
     let u = tr('張'), extras = '';
+    u = X()?.unit?.(evKind) ?? u;                 // 影片有自己的單位
+    extras = X()?.doneExtras?.(ev) || '';        // 以及另外存的東西（那一格畫面、資料表）
     const where = folderName(ev.folder);
     $('nameLine').textContent = ev.headline || curName || '';
     const sm = ev.small || 0, allSmall = !n && !du && sk > 0 && sm >= sk;   // 全部都是太小的（像圖示）：不是「之前抓過」
@@ -837,6 +864,7 @@
     const lines = [];
     if (pv) lines.push(tr('這一頁本身讀不到圖，只存到分享連結時顯示的那張預覽圖，放在「{w}」。', { w: esc(where) }));
     else if (n) lines.push(n === 1 ? tr('放在「{w}」。', { w: esc(where) }) : tr('{n} {u}，放在「{w}」。', { n, u, w: esc(where) }));
+    if (n > 1 && ev.videos) lines.push(tr('其中 {n} 支是影片。', { n: ev.videos }));   // 圖版裡的影片 pin 存的是影片本身
     else if (allSmall) lines.push(tr('這一頁的圖都太小（像圖示、按鈕），沒有存。'));
     else if (!du && !allFail) lines.push(tr('全部 {n} {u}都已經在「{w}」裡。', { n: sk, u, w: esc(where) }));
     const minor = [sk && n ? tr('另外 {n} {u}略過（抓過或太小）', { n: sk, u }) : '', fl ? tr('{n} {u}抓不到', { n: fl, u }) : ''].filter(Boolean).join(tr('，'));
@@ -848,6 +876,7 @@
     if (ev.w && ev.h) {
       $('proofDims').textContent = `${ev.w} × ${ev.h}`;
       let own = '';
+      own = X()?.proofX?.(ev) || '';                // 影片有自己的第二格（畫質）
       let x = own;
       if (!x && ev.page_w && ev.w / ev.page_w >= 1.3) { const r = ev.w / ev.page_w; x = tr('頁面上那張的 {r} 倍', { r: r >= 10 ? Math.round(r) : r.toFixed(1) }); }
       if (n > 1 && !own) $('proofDims').textContent = tr('最大 {d}', { d: `${ev.w} × ${ev.h}` });
@@ -855,6 +884,7 @@
     } else { $('proofDims').textContent = ''; $('proofX').textContent = ''; }
     // 追蹤：一整批才有意義
     let batchy = (total > 1 || ev.added > 1) && !ev.baseline;
+    if (X()?.noFollow?.(ev)) batchy = false;
     $('followBtn').classList.toggle('hide', !batchy);
     $('followBtn').textContent = ev.following ? tr('追蹤中 ✓') : tr('追蹤，之後只抓新的');
     $('followBtn').classList.toggle('on', !!ev.following);
@@ -921,6 +951,7 @@
     document.body.dataset.page = id || '';
     if (id === 'pRecent') { showTab(false); if (history.length) send('histThumbs'); }
   };
+  window.FullyUI.openPage = openPage;
   $('recentBtn').onclick = () => openPage('pRecent');
   $('settingsBtn').onclick = () => openPage('pSettings');
   $('sitesBtn').onclick = () => openPage('pSites', true);
@@ -951,6 +982,7 @@
   // ── 精靈：頁面清單 ──
   let wizIdx = 0, agreed = false;
   let wizPages = () => ['welcome', 'dest', 'call'];
+  wizPages = () => X()?.wizardPages?.(['welcome', 'dest', 'call']) || ['welcome', 'dest', 'call'];   // 擴充會插一頁（影片引擎更新）
   function wizGo(i) {
     const pages = wizPages(), last = pages.length - 1;
     wizIdx = Math.max(0, Math.min(last, i));
@@ -963,6 +995,7 @@
     $('wnext').textContent = wizIdx === 0 ? tr('開始設定') : (wizIdx === last ? tr('好了，開始用') : tr('下一步'));
     $('wnext').disabled = wizIdx === 0 && !agreed;          // 使用規範：勾了「我了解」才能繼續
   }
+  window.FullyUI.wizGo = wizGo;
   $('agreeBox').onclick = () => { agreed = !agreed; $('agree').classList.toggle('on', agreed); send('agree', { on: agreed }); wizGo(wizIdx); };
   $('wTerms').onclick = () => send('openDoc', { doc: 'terms' });
   $('wnext').onclick = () => { if (wizIdx === 0 && !agreed) return; if (wizIdx === 0) send('checkUpdate'); if (wizIdx === wizPages().length - 1) { send('wizardDone'); return; } wizGo(wizIdx + 1); };
@@ -979,6 +1012,7 @@
       follows: [{ id: 'a', name: 'INTENTION Journal', lastCheck: '9/24 12:00', lastNew: 3 }, { id: 'b', name: 'INTENTION — Works', lastCheck: '9/24 12:00', lastNew: 0 }],
       done: { added: 40, skipped: 2, w: 4032, h: 3024, page_w: 640, dups: 0 }, one: { w: 4032, h: 3024, page_w: 236 },
       err: tr('這個網頁不是公開的。Fully 只存公開看得到的圖。') };
+    D = X()?.demoData?.() || D;   // 擴充可以換成它自己的假資料
     const src = () => { $('url').value = D.url; onInput(); E({ type: 'started', url: D.url }); E({ type: 'source', kind: D.kind, label: D.label, name: D.name, count: D.count, folder: '/x/' + D.name }); };
     const pv = () => E({ type: 'preview', url: D.url, kind: D.kind, label: D.label, name: D.name, count: D.count, w: D.done.w, h: D.done.h, multi: true });
     E({ type: 'history', items: D.recent }); E({ type: 'follows', items: D.follows });
@@ -995,12 +1029,15 @@
        settings: () => openPage('pSettings'), sites: () => openPage('pSites'),
        terms: () => send('openDoc', { doc: 'terms' }), privacy: () => send('openDoc', { doc: 'privacy' }) };
     if (states[s]) states[s]();
+    else X()?.demo?.(s);                // 其他狀態（影片）交給擴充
   };
 
   classify(); translate(); paint(); wizGo(0);
   // 等整頁載完才跟 Swift 說好了，第一批事件才不會比介面早到
   window.addEventListener('load', () => {
+    X()?.init?.();   // 擴充是後面的 <script>，這時候才載完
     classify(); translate(); paint(); wizGo(0); send('ready');
   });
 })();
 </script>
+<script src="ui-media.js"></script>
