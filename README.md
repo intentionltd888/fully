@@ -14,6 +14,7 @@ Fully 是 macOS 上的設計參考收集工具（design reference collector）�
 - **原尺寸**：縮圖網址換成原圖（建站平台與圖片 CDN 的規則，加上 maxurl 規則庫）；完成畫面告訴你實際拿到多大、是頁面上那張的幾倍。
 - **影片**：上千個影片網站，公開看得到的都行。最高畫質，存好 QuickTime 直接能播；也可以只要聲音、每個鏡頭截圖、標題與留言。網址帶時間點（t=83）會另存那一格畫面。影片引擎每天在背景跟上網站改版（設定裡可以關）。
 - **圖版**：整個圖版讀到底、一張不漏；影片 pin 存影片本身，多頁的 pin 每一頁都存。
+- **貼文**：貼一則公開貼文的網址，輪播裡每一張圖和影片、作者自己接在下面的串文都存。圖片原尺寸；影片取那則貼文能給的最高畫質（直連的檔只到 720p、另有 1080p 畫面時，接上聲音並確保 QuickTime 能播）。
 - **快，而且不打擾**：同時下載、對限流的網站客氣；下載中 Mac 不睡；Dock 圖示有進度條與排隊數，選單列有進度環；關掉再開會接著抓。
 - **抓完馬上能用**：單張圖直接放進剪貼簿（⌘V 貼進設計軟體）；縮圖可以拖出去；每個檔的「來源」欄記著原網址（Spotlight 找得回來）。
 - **之後**：追蹤一個網頁、圖版或影片清單，每 6 小時回去看一次、只抓新的；一模一樣的圖不存第二份；最近抓的留 30 筆。
@@ -64,7 +65,8 @@ app/Sources/   Swift 殼：main（面板、佇列、剪貼簿、選單列、服�
                Engines（影片引擎每天自動更新）
 app/           ui.html（主面板）、ui-media.js（影片與圖版的畫面）、card.html（預覽卡）、Share/（分享選單擴充）、lproj/（服務選單名稱）、brand/（商標）
 engine/        Python 引擎：grab.py（掃圖、原尺寸規則、預覽）、core.py（下載、去重、事件）、maxurl.py＋maxurl_runner.js、
-               media.py（掛上影片與圖版）、video.py（影片：yt-dlp＋ffmpeg）、pin_grab.py（圖版）
+               media.py（掛上影片、圖版與貼文）、video.py（影片：yt-dlp＋ffmpeg）、pin_grab.py（圖版）、
+               threads_grab.py（貼文）
 scripts/       vendor-fetch、make-dmg、notarize、check-clean／check-binary（公開前清洗）
 ```
 

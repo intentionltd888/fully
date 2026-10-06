@@ -14,6 +14,7 @@ Fully is a design reference collector for macOS. Copy the link of a web page and
 - **Original size**: thumbnail URLs are swapped for the originals (rules for site builders and image CDNs, plus the maxurl rule set). The done screen tells you the size you actually got and how many times larger it is than the one on the page.
 - **Video**: thousands of video sites — anything publicly visible. Best quality, plays in QuickTime right away; or just the audio, a frame from each shot, or titles & comments. A link with a timestamp (t=83) also saves that frame. The video engine keeps up with site changes in the background, once a day (you can turn this off).
 - **Boards**: reads a whole board to the end, nothing skipped; video pins are saved as videos and every page of a multi-page pin is saved.
+- **Posts**: paste the link of a public post and Fully saves every image and video in it, each item of a carousel, and the author's own follow-up posts in the thread. Images at original size; videos at the best quality the post offers (when the direct file stops at 720p and a 1080p picture exists, Fully joins it with the sound and makes sure QuickTime can play it).
 - **Fast and quiet**: parallel downloads that stay polite with rate-limited sites; your Mac doesn't sleep mid-download; the Dock icon shows a progress bar and how many are queued, the menu bar shows a progress ring; quit and reopen and it picks up where it left off.
 - **Ready to use**: a single image goes straight to the clipboard (⌘V into your design tool); thumbnails can be dragged out; every file's "Where from" field keeps the source link (findable in Spotlight).
 - **Afterwards**: follow a page, board or playlist and Fully checks it every 6 hours, grabbing only what's new; identical images are never saved twice; the last 30 grabs are kept.
@@ -65,7 +66,8 @@ app/Sources/   Swift shell: main (panel, queue, clipboard, menu bar, Services, f
 app/           ui.html (main panel), ui-media.js (video and board screens), card.html (preview card), Share/ (Share menu extension),
                lproj/ (Services menu names), brand/ (trademarks)
 engine/        Python engine: grab.py (page scan, original-size rules, preview), core.py (downloads, dedup, events), maxurl.py + maxurl_runner.js,
-               media.py (hooks in video and boards), video.py (video: yt-dlp + ffmpeg), pin_grab.py (boards)
+               media.py (hooks in video, boards and posts), video.py (video: yt-dlp + ffmpeg), pin_grab.py (boards),
+               threads_grab.py (posts)
 scripts/       vendor-fetch, make-dmg, notarize, check-clean / check-binary (pre-publish scans)
 ```
 
