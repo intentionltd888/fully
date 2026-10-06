@@ -290,6 +290,12 @@
   .agree .box { flex: 0 0 24px; height: 24px; border-radius: 8px; box-shadow: var(--raise-sm); display: grid; place-items: center; }
   .agree .box svg { width: 14px; height: 14px; opacity: 0; } .agree .box svg * { stroke-width: 3; }
   .agree.on .box { box-shadow: var(--checked); } .agree.on .box svg { opacity: 1; }
+  /* 存好了的「細節」：原生 details，收起時只佔一行 */
+  #sub details.more { margin-top: 8px; }
+  #sub details.more summary { list-style: none; cursor: pointer; color: var(--ink-mid); width: max-content; }
+  #sub details.more summary::-webkit-details-marker { display: none; }
+  #sub details.more summary::after { content: " ›"; display: inline-block; transition: transform .14s; }
+  #sub details.more[open] summary::after { transform: rotate(90deg); }
 </style>
 
 <div class="app">
@@ -358,8 +364,8 @@
   <div class="hd"><span class="t-display" data-i18n>設定</span><button class="cap-key" data-close><span data-i18n>好</span></button></div>
   <div class="bd">
     <div class="row"><div class="l"><div class="t-body" data-i18n>存到哪裡</div><div class="t-cap one" id="dest">—</div></div><button class="cap-key sm" id="pick"><span data-i18n>更改</span></button></div>
-    <div class="row col"><div class="l"><div class="t-body" data-i18n>複製網址時</div><div class="t-cap" data-i18n>問我＝右上角跳一張預覽卡，點一下才抓；它只先看一眼網頁，不會自己下載。</div></div>
-      <span class="seg" id="clipSeg"><button data-clip="card" data-i18n>問我</button><button data-clip="auto" data-i18n>直接抓</button><button data-clip="off" data-i18n>不動</button></span></div>
+    <div class="row col"><div class="l"><div class="t-body" data-i18n>複製網址時</div><div class="t-cap" data-i18n>問我：右上角跳一張卡，點了才抓（會先讀一次那個網頁，不下載）。</div></div>
+      <span class="seg" id="clipSeg"><button data-clip="card" data-i18n>問我</button><button data-clip="auto" data-i18n>直接抓</button><button data-clip="off" data-i18n>關掉</button></span></div>
     <button class="row" id="copyRow"><div class="l"><div class="t-body" data-i18n>單張圖抓完放進剪貼簿</div><div class="t-cap" data-i18n>⌘V 就能貼進 Figma、Keynote</div></div><span class="sw" id="copySw"><i></i></span></button>
     <button class="row" id="dedupRow"><div class="l"><div class="t-body" data-i18n>同一張不存兩次</div><div class="t-cap" data-i18n>比對存放資料夾裡已經有的圖</div></div><span class="sw" id="dedupSw"><i></i></span></button>
     <div id="extSettings"></div>
@@ -423,7 +429,7 @@
       <li><span data-i18n>或點 Dock 上的 Fully</span> <span class="g-dock"><i></i></span><span data-i18n>、選單列的小圖示</span> <span class="g-dot"><svg viewBox="0 0 10 10"><path d="M7 0h3v10H7ZM0 7h10v3H0ZM4 7L7 7A7 7 0 0 0 0 0L0 3A4 4 0 0 1 4 7Z"/></svg></span></li>
       <li data-i18n>複製一個網址，右上角會跳出預覽卡，<br>點「抓下來」就開始。</li>
     </ol>
-    <div class="wrow"><span class="t-body" style="color:var(--ink)" data-i18n>複製網址時</span><span class="seg" id="wclipSeg"><button data-clip="card" data-i18n>問我</button><button data-clip="auto" data-i18n>直接抓</button><button data-clip="off" data-i18n>不動</button></span></div>
+    <div class="wrow"><span class="t-body" style="color:var(--ink)" data-i18n>複製網址時</span><span class="seg" id="wclipSeg"><button data-clip="card" data-i18n>問我</button><button data-clip="auto" data-i18n>直接抓</button><button data-clip="off" data-i18n>關掉</button></span></div>
   </div>
   <div class="wnav">
     <button class="link l" id="wback" data-i18n>上一步</button>
@@ -445,8 +451,8 @@
     '最近抓的': 'Recent', '設定': 'Settings', '好': 'Done', '取消': 'Cancel', '打開存放的資料夾': 'Open the save folder', '清除這份紀錄': 'Clear this list',
     '每 6 小時回去看一次，只抓新的。': 'Checked every 6 hours — only new things are grabbed.', '現在檢查': 'Check now',
     '存到哪裡': 'Save to', '更改': 'Change', '複製網址時': 'When I copy a link',
-    '問我＝右上角跳一張預覽卡，點一下才抓；它只先看一眼網頁，不會自己下載。': 'Ask = a preview card pops up top-right; nothing downloads until you click. It only takes a quick look at the page first.',
-    '問我': 'Ask me', '直接抓': 'Grab right away', '不動': 'Do nothing',
+    '問我：右上角跳一張卡，點了才抓（會先讀一次那個網頁，不下載）。': 'Ask: a card pops up top-right; nothing downloads until you click (it reads the page once first).',
+    '問我': 'Ask me', '細節': 'Details', '怎麼用': 'How to use', '一次看全部圖': 'See them all at once', '一次看全部鏡頭': 'See every shot at once', '直接抓': 'Grab right away', '關掉': 'Off',
     '單張圖抓完放進剪貼簿': 'Put single images on the clipboard', '⌘V 就能貼進 Figma、Keynote': 'So ⌘V pastes the original into Figma or Keynote',
     '同一張不存兩次': "Don't save the same image twice", '比對存放資料夾裡已經有的圖': 'Compares with images already in your save folder',
     '從瀏覽器一鍵送進 Fully': 'Send pages from your browser', '把這顆拖到書籤列。在任何網頁按一下，就交給 Fully。': 'Drag this to your bookmarks bar. Click it on any page to hand the page to Fully.',
@@ -491,7 +497,7 @@
     '張': 'images',
     '最大 {d}': 'Up to {d}', '頁面上那張的 {r} 倍': '{r}× the one on the page',
     '原圖已在剪貼簿，⌘V 就能貼。': 'The original is on your clipboard — ⌘V to paste.',
-    '追蹤，之後只抓新的': 'Follow for new', '追蹤中 ✓': 'Following ✓',
+    '之後只抓新的': 'Follow for new', '追蹤中 ✓': 'Following ✓',
     '{n} 個存好了': '{n} saved', '都抓不到': "Couldn't grab any", '{n} 個都存好了': 'All {n} saved', '{n} 個抓不到：': "{n} couldn't be grabbed:", '全部重試': 'Retry all',
     '已停止': 'Stopped', '這個抓不到': "Couldn't grab this",
     '剪貼簿裡沒有網址。先到網頁上把網址複製起來。': "There's no link on the clipboard. Copy one from a web page first.",
@@ -542,6 +548,8 @@
   const urlsNow = () => $('url').value.split(/[\n\s,]+/).filter(u => /^https?:\/\//.test(u));
   const resolving = on => document.body.classList.toggle('resolving', on);
   const prog = f => { if (!isFinite(f)) return; const p = Math.max(0, Math.min(1, f)) * 100; $('arc').style.setProperty('--p', p); $('head').style.setProperty('--p', p); };
+  const openLabel = () => { const sp = $('openBtn').querySelector('span'); if (sp) sp.textContent = lastSheet ? (evKind === 'video' ? tr('一次看全部鏡頭') : tr('一次看全部圖')) : tr('打開看看'); };   // 有總覽圖＝打開的就是它
+  const howTo = t => `<details class="more"><summary>${tr('怎麼用')}</summary>${t}</details>`;   // 空白畫面的說明收起來
   const setText = (big, sub) => { if (big !== undefined) $('state').innerHTML = big; if (sub !== undefined) $('sub').innerHTML = sub; };
   const note = t => { $('note').innerHTML = t || ''; };
   let toastT = 0;
@@ -632,8 +640,9 @@
     if (view === 'empty') {
       let s = null;
       s = X()?.emptySub?.(prefs.clip);
-      setText(tr('先複製一個網址'), s || (prefs.clip === 'card' ? tr('在任何網頁複製網址，右上角會跳出預覽卡；<br>或回到這裡，網址會自己出現。')
-        : prefs.clip === 'auto' ? tr('直接抓開著：在任何地方複製網址，<br>Fully 會自己開始抓。') : tr('到任何網頁把網址複製起來，<br>再回到這裡，它會自己出現。')));
+      const t = s || (prefs.clip === 'card' ? tr('在任何網頁複製網址，右上角會跳出預覽卡；<br>或回到這裡，網址會自己出現。')
+        : prefs.clip === 'auto' ? tr('直接抓開著：在任何地方複製網址，<br>Fully 會自己開始抓。') : tr('到任何網頁把網址複製起來，<br>再回到這裡，它會自己出現。'));
+      setText(tr('先複製一個網址'), (prefs.clip === 'auto' && !s) ? t : howTo(t));
     }
     if (view === 'image') setText(tr('可以下載了'), tr('按中間那顆開始。<br>抓的是原始大圖，不是頁面上的縮圖。'));
     X()?.paint?.(view);
@@ -756,7 +765,7 @@
       case 'histThumb': { const t = $('histList').querySelector(`[data-i="${ev.i}"] .tile`); if (t) { t.classList.add('pic'); const im = t.querySelector('img'); im.onload = () => im.classList.add('on'); im.src = ev.data; } break; }
       case 'follows': follows = ev.items || []; renderFollows(ev.checking); break;
       case 'about': $('aboutLine').textContent = `${ev.version || ''}（${ev.build || ''}）・${tr('開源')}`; break;
-      case 'extra': if (ev.sheet) lastSheet = ev.sheet; break;
+      case 'extra': if (ev.sheet) { lastSheet = ev.sheet; if (mode === 'done') openLabel(); } break;
       case 'theme': {
         const m = ev.mode || 'system';
         if (m === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = m;
@@ -849,7 +858,7 @@
 
   function done(ev) {
     resolving(false); mode = 'done'; prog(1); lastDoneEv = ev;
-    lastFile = ev.file || null; lastFolder = ev.folder || null; if (ev.sheet) lastSheet = ev.sheet;
+    lastFile = ev.file || null; lastFolder = ev.folder || null; if (ev.sheet) lastSheet = ev.sheet; openLabel();
     $('url').value = ''; classify(); previewFor = '';             // 抓完清空，下一個網址才進得來
     const n = ev.added || 0, sk = ev.skipped || 0, fl = ev.failed || 0, du = ev.dups || 0;
     let u = tr('張'), extras = '';
@@ -871,7 +880,8 @@
     if (minor) lines.push(minor + (LANG === 'en' ? '.' : '。'));
     if (du) lines.push(ev.dup_saved ? tr('其中 {n} 張跟之前抓的一模一樣', { n: du }) : tr('{n} 張跟之前抓的一模一樣，沒再存一份', { n: du }));
     if (extras) lines.push(tr('另外存了{x}。', { x: extras }));
-    setText(head, lines.join('<br>'));
+    const first = lines.shift() || '';
+    setText(head, first + (lines.length ? `<details class="more"><summary>${tr('細節')}</summary>${lines.join('<br>')}</details>` : ''));   // 第一眼只看「放在哪」，略過／重複／另外存的收進細節
     // 拿到多大（量的是存下來的檔）
     if (ev.w && ev.h) {
       $('proofDims').textContent = `${ev.w} × ${ev.h}`;
@@ -886,7 +896,7 @@
     let batchy = (total > 1 || ev.added > 1) && !ev.baseline;
     if (X()?.noFollow?.(ev)) batchy = false;
     $('followBtn').classList.toggle('hide', !batchy);
-    $('followBtn').textContent = ev.following ? tr('追蹤中 ✓') : tr('追蹤，之後只抓新的');
+    $('followBtn').textContent = ev.following ? tr('追蹤中 ✓') : tr('之後只抓新的');
     $('followBtn').classList.toggle('on', !!ev.following);
     // 縮圖拖出去：單張＝那個檔；一批＝整個資料夾
     const dragTarget = lastFile || ev.dup_of || lastFolder;

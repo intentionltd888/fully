@@ -17,7 +17,7 @@
     '影片抓完，每換一個鏡頭截一張，<br>再拼成一張總覽圖。': 'Grabs the video, saves a frame at every cut,<br>then lays them out on one overview sheet.',
     '不抓影片：標題、觀看數、發布日、留言，<br>整理成一張表。': 'No video: titles, views, dates and comments,<br>organized into a spreadsheet.',
     '另外存 {t} 那一格畫面。': 'Also saves the frame at {t}.',
-    '圖版': 'Board', '這不是公開的內容': "This isn't public",
+    '圖版': 'Board', '貼文': 'Post', '這不是公開的內容': "This isn't public",
     '自動跟上網站改版': 'Keep up with site changes', '每天在背景更新一次': 'Updates once a day in the background', '已關掉，一直用現在這版': 'Off — always using this version',
     '正在檢查更新…': 'Checking for updates…', '自動更新': 'Auto-update', '狀態': 'Status',
     '影片網站常改版，沒跟上就抓不到。Fully 每天在背景<br>更新一次影片引擎，只連 GitHub，不傳任何東西出去。': "Video sites change often; without updates, grabs break. Fully updates its<br>video engine once a day in the background — it only talks to GitHub and sends nothing out.",
@@ -34,6 +34,7 @@
   const hostOf = u => { try { return new URL(u).hostname.toLowerCase().replace(/^www\./, ''); } catch (e) { return ''; } };
   const isVideoHost = h => VIDEO_HOSTS.some(d => h === d || h.endsWith('.' + d));
   const isBoard = h => /(^|\.)pinterest\.[a-z.]+$/.test(h) || h === 'pin.it';
+  const isPost = u => /(^|\.)threads\.(net|com)$/.test(hostOf(u)) && /^\/(@[^/]+|t\/[^/]+)/.test((() => { try { return new URL(u).pathname; } catch (e) { return ''; } })());   // 跟 threads_grab.py 的 handles 對齊
   const isVideoFile = u => { try { return /\.(mp4|mov|m4v|webm|mkv|m3u8)$/i.test(new URL(u).pathname); } catch (e) { return false; } };   // 直接指到影片檔（跟 video.py 的 is_video_file 對齊）
 
   const GET = { av: '最高畫質，存好直接能播；有中英字幕會一起存。', audio: '存成一首帶封面的音樂檔。',
@@ -138,6 +139,7 @@
       if (isVideoHost(h) || isVideoFile(u)) return { label: tr('影片'), kind: 'video' };
       if (pick !== 'av') setPick('av');
       if (isBoard(h)) return { label: tr('圖版'), kind: 'image' };
+      if (isPost(u)) return { label: tr('貼文'), kind: 'image' };
       return null;
     },
     view(kind) { return kind === 'video' ? 'video' : null; },
@@ -157,7 +159,7 @@
       return bits.join('・') || null;
     },
     onSource(ev) { if (ev.kind !== 'video') return false; UI.setText('0%'); UI.running(tr('下載中'), 0); return true; },
-    stageText(st) { return /合併|轉檔|處理/.test(st) ? tr('正在轉成能播的格式') : /資料/.test(st) ? tr('正在整理資料') : /抽影格|接觸表/.test(st) ? tr('正在截每個鏡頭') : null; },
+    stageText(st) { return /合併|轉檔|處理/.test(st) ? tr('正在轉成能播的格式') : /資料/.test(st) ? tr('正在整理資料') : /抽影格|接觸表|一次看全部/.test(st) ? tr('正在截每個鏡頭') : null; },
     unit(kind) { return kind === 'video' ? tr('個') : undefined; },
     doneExtras(ev) { return [ev.frame ? tr('那一格畫面') : '', ev.csv ? tr('一張資料表') : ''].filter(Boolean).join('、'); },
     proofX(ev) { return ev.res ? `${ev.res}${ev.fps > 30 ? ev.fps : ''}${ev.hdr ? ' HDR' : ''}` : ''; },

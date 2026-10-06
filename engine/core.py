@@ -528,6 +528,44 @@ class Seen:
             pass
 
 
+def fetch_dash(video_url, audio_url=None, seconds=0):
+    """分開的畫面軌＋聲音軌（DASH 清單裡的兩個檔，各自是完整的 mp4，不是切片）→ 一支 QuickTime 能播的 mp4。
+    ffmpeg 直接讀兩個網址、不重編接成一支，不留中繼檔；知道清單的長度就比對，短了一成以上＝沒讀完，丟錯讓下載端改用備援。
+    畫面是 QuickTime 不認的編碼（VP9 之類）時交給 video.ensure_playable 轉。回 (位元組, 暫存檔)，同 fetch_hls。"""
+    import json as _json
+    import subprocess
+    import tempfile
+    import video
+    ff = find_ffmpeg_dir()
+    if not ff:
+        raise ValueError(T("少了影片引擎，接不起畫面與聲音", "The video engine is missing — can't join picture and sound"))
+    out = os.path.join(tempfile.mkdtemp(prefix="fully-dash-"), "v.mp4")
+    cmd = [os.path.join(ff, "ffmpeg"), "-v", "error", "-y", "-user_agent", ua_for(video_url), "-i", iri(video_url)]
+    if audio_url:
+        cmd += ["-user_agent", ua_for(audio_url), "-i", iri(audio_url), "-map", "0:v:0", "-map", "1:a:0"]
+    cmd += ["-c", "copy", "-movflags", "+faststart", out]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    if r.returncode != 0 or not os.path.isfile(out):
+        last = (r.stderr or "").strip().splitlines()
+        raise ValueError(last[-1][:60] if last else T("畫面與聲音接不起來", "couldn't join picture and sound"))
+    if seconds:
+        ffprobe = os.path.join(ff, "ffprobe")
+        try:
+            got = float((_json.loads(subprocess.run(
+                [ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", out],
+                capture_output=True, text=True, timeout=60).stdout or "{}").get("format") or {}).get("duration") or 0)
+        except Exception:
+            got = 0
+        if got and got < seconds * 0.9:
+            raise ValueError(T("影片沒讀完整", "the video came back incomplete"))
+    video.ensure_playable(out)
+    with open(out, "rb") as fh:
+        blob = fh.read()
+    if not is_mp4(blob):
+        raise ValueError(T("不是影片檔", "not a video"))
+    return blob, out
+
+
 class DLResult:
     """download() 的結果。可以照舊 `ok, skipped, failed = download(...)` 拆開，也可以拿更多欄位。"""
 
@@ -575,6 +613,8 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
                 with host_sem(cand):
                     if vid and r.get("hls") and cand == r["url"]:
                         blob, src_file = fetch_hls(cand, r.get("referer"))
+                    elif vid and r.get("dash") and cand == r["url"]:
+                        blob, src_file = fetch_dash(cand, *r["dash"])
                     else:
                         blob = fetch_bytes(cand, r.get("referer"), video=vid)
                 used = cand
@@ -844,11 +884,11 @@ IMG_SHEET_EXT = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".bmp", ".ti
 
 
 def sheet_for_images(folder, since, minimum=6, cap=60):
-    """圖片批次（情境 2：整個板／整個專案）抓完，≥ minimum 張就出一張「接觸表.jpg」讓人一眼看完。
+    """圖片批次（情境 2：整個板／整個專案）抓完，≥ minimum 張就出一張「一次看全部圖.jpg」讓人一眼看完。
     只拿這次新抓的（mtime ≥ since），最多 cap 張；已有接觸表就不重做。"""
     if not folder or not os.path.isdir(folder):
         return None
-    sheet = os.path.join(folder, "接觸表.jpg")
+    sheet = os.path.join(folder, "一次看全部圖.jpg")
     if os.path.exists(sheet):
         return None
     ffdir = find_ffmpeg_dir()

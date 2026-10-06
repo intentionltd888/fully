@@ -543,7 +543,7 @@ def grab_video(url, dest, audio=False, data=False, frames=False, signed_out=None
             r = extract_frames(f, ff, progress=lambda pct: pg.emit(type="progress", percent=int(90 + pct * 0.09), stage="抽影格", name=title[:40]))
             if r:
                 sheet = r
-                pg.log(f"  抽了影格＋接觸表：{os.path.basename(os.path.dirname(r))}")
+                pg.log(f"  抽了影格＋一次看全部鏡頭：{os.path.basename(os.path.dirname(r))}")
                 pg.emit(type="notice", message=T("每個鏡頭的截圖和總覽圖都存好了", "Shot frames and the overview sheet are saved"))
 
     # 網址帶時間點 → 另存那一格（提案簡報與分鏡參考常用；螢幕截圖只有縮圖畫質）
@@ -606,7 +606,7 @@ def extract_frames(video, ffdir, progress=None, cap=60, cols=5):
         return None
     if progress:
         progress(70)
-    sheet = contact_sheet([os.path.join(outdir, f) for f in frames], f"{stem} 接觸表.jpg", ffmpeg, cols=cols)
+    sheet = contact_sheet([os.path.join(outdir, f) for f in frames], f"{stem} 一次看全部鏡頭.jpg", ffmpeg, cols=cols)
     if progress:
         progress(100)
     return sheet
