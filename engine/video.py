@@ -53,6 +53,14 @@ def is_video_host(host):
     return any(host == h or host.endswith("." + h) for h in HOSTS)
 
 
+# 認得的音樂與 Podcast 平台：走這條線的「只要聲音」（yt-dlp 的擷取器；有 DRM 的照舊抓不到）
+AUDIO_HOSTS = ("soundcloud.com", "bandcamp.com", "mixcloud.com", "audiomack.com", "podcasts.apple.com")
+
+
+def is_audio_host(host):
+    return any(host == h or host.endswith("." + h) for h in AUDIO_HOSTS)
+
+
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".webm", ".mkv", ".m3u8")
 
 
@@ -397,9 +405,9 @@ def grab_video(url, dest, audio=False, data=False, frames=False, signed_out=None
     outlist = os.path.join(tempfile.gettempdir(), f"fully-out-{os.getpid()}.txt")
     nd = "[protocol!*=dash]" if no_dash else ""    # Vimeo 內嵌播放器：DASH 軌帶 DRM，只拿 HLS
     if audio:
-        # 僅音訊：最佳音軌 → M4A（AAC，QuickTime 原生）
+        # 僅音訊：最佳音軌；本來就是 MP3 的照原樣（不重壓），其餘 → M4A（AAC 直接換殼，Opus 之類才轉；QuickTime 原生）
         # ＋封面＋中繼資料。獨立版 yt-dlp 內建 mutagen，--embed-thumbnail 可用。
-        mode_args = ["-f", f"ba{nd}/b{nd}", "-x", "--audio-format", "m4a", "--audio-quality", "0",
+        mode_args = ["-f", f"ba{nd}/b{nd}", "-x", "--audio-format", "mp3>mp3/m4a", "--audio-quality", "0",
                      "--embed-thumbnail", "--add-metadata"]
     else:
         fmt = f"bv*{nd}+ba{nd}/b{nd}" if ff else f"b{nd}"    # 沒 ffmpeg 就退單檔最佳（畫質受限），有才能合最高畫質

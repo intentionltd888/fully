@@ -376,7 +376,7 @@
     <div class="row col"><div class="l"><div class="t-body" data-i18n>叫出 Fully</div><div class="t-cap" data-i18n>在任何地方同時按這四個鍵</div></div><span class="kb" data-keys="control option command V"></span></div>
     <button class="row" id="sitesBtn"><div class="l"><div class="t-body" data-i18n>Fully 能做什麼</div></div><span class="go"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span></button>
     <div class="row col"><div class="l"><div class="t-body" data-i18n>關於 Fully</div><div class="t-cap one" id="aboutLine">—</div></div>
-      <span class="wrow" style="margin-top:0"><button class="link" id="docTerms" data-i18n>使用規範</button><button class="link" id="docPrivacy" data-i18n>隱私與權限</button></span></div>
+      <span class="wrow" style="margin-top:0"><button class="link" id="updBtn" style="display:none"></button><button class="link" id="docTerms" data-i18n>使用規範</button><button class="link" id="docPrivacy" data-i18n>隱私與權限</button></span></div>
   </div>
 </div>
 
@@ -458,7 +458,7 @@
     '從瀏覽器一鍵送進 Fully': 'Send pages from your browser', '把這顆拖到書籤列。在任何網頁按一下，就交給 Fully。': 'Drag this to your bookmarks bar. Click it on any page to hand the page to Fully.',
     '抓進 Fully': 'Grab with Fully', '拷貝這段': 'Copy the code', '外觀': 'Appearance', '跟系統': 'System', '淺色': 'Light', '深色': 'Dark', '語言': 'Language',
     '叫出 Fully': 'Bring up Fully', '在任何地方同時按這四個鍵': 'Press these four keys together, anywhere', 'Fully 能做什麼': 'What Fully does', '關於 Fully': 'About Fully',
-    '使用規範': 'Terms of use', '隱私與權限': 'Privacy & permissions',
+    '使用規範': 'Terms of use', '隱私與權限': 'Privacy & permissions', '下載新版': 'Get the new version', '有新版': 'new version',
     '貼上網址就好，Fully 會自己判斷。': 'Just paste a link — Fully figures out the rest.',
     '<b>任何網頁</b><br>掃出頁面上公開看得到的圖，<br>一張張換成原始尺寸，同時下載。': '<b>Any web page</b><br>Finds the publicly visible images on the page<br>and saves each one at its original size, several at a time.',
     '<b>存下來之前</b><br>複製網址，右上角先跳一張預覽卡：<br>有幾張、能拿到多大、之前抓過沒。<br>只要其中幾張？按「挑幾張」。': '<b>Before saving</b><br>Copy a link and a preview card pops up:<br>how many images, how big they get, whether you saved it before.<br>Only want a few? Tap “Pick some”.',
@@ -487,7 +487,7 @@
     '不到 1 分鐘': 'under a minute', '大約還要 {n} 分鐘': 'about {n} min left', '，': ', ',
     '{a}／{b} 張': '{a} / {b}', '{n} 張': '{n}', '邊讀邊抓，抓的是原始尺寸。': 'Saving as it reads — at original size.',
     '存好了': 'Saved', '之前就抓過了': 'Already saved', '早就有了': 'Already saved', '沒有夠大的圖': 'No big images', '這次沒抓到': 'Nothing came through',
-    '只有預覽圖': 'Preview image only', '其中 {n} 支是影片。': '{n} of them are videos.', '這一頁本身讀不到圖，只存到分享連結時顯示的那張預覽圖，放在「{w}」。': "Couldn't read any images from the page itself — saved only the preview image shown when the link is shared, in “{w}”.",
+    '只有預覽圖': 'Preview image only', '其中 {n} 支是影片。': '{n} of them are videos.', '其中 {n} 個是音檔。': '{n} of them are audio files.', '這一頁本身讀不到圖，只存到分享連結時顯示的那張預覽圖，放在「{w}」。': "Couldn't read any images from the page itself — saved only the preview image shown when the link is shared, in “{w}”.",
     '這一頁的圖都太小（像圖示、按鈕），沒有存。': 'Everything on this page was tiny (icons, buttons) — nothing saved.',
     '{n} {u}，放在「{w}」。': '{n} {u} in “{w}”.', '放在「{w}」。': 'In “{w}”.', '全部 {n} {u}都已經在「{w}」裡。': 'All {n} {u} are already in “{w}”.',
     '另外 {n} {u}略過（抓過或太小）': '{n} {u} skipped (already there or too small)', '{n} {u}抓不到': "{n} {u} couldn't be grabbed",
@@ -541,6 +541,12 @@
 
   let mode = 'idle';                 // idle／run／done／err
   let kind = 'none', srcLabel = '', total = 0, evKind = '', curName = '';
+  // 下載中的「幾張」：來源有自己的單位（音檔、影片＝個）就用它，不然照舊「張」
+  const count = (a, b) => {
+    const u = X()?.unit?.(evKind);
+    if (u === undefined) return b ? tr('{a}／{b} 張', { a, b }) : tr('{n} 張', { n: a });
+    return (b ? `${a}${LANG === 'en' ? ' / ' : '／'}${b}` : `${a}`) + (u ? ' ' + u : '');
+  };
   let qState = { pending: [], done: 0, total: 0, active: false };
   let lastFile = null, lastSheet = null, lastFolder = null, lastStarted = '', history = [], prefs = { clip: 'card' };
   let t0 = 0, f0 = 0, lastEta = '', runUrl = '', preview = null, previewFor = '', pickIds = null, lastDoneEv = null, follows = [];
@@ -765,6 +771,11 @@
       case 'histThumb': { const t = $('histList').querySelector(`[data-i="${ev.i}"] .tile`); if (t) { t.classList.add('pic'); const im = t.querySelector('img'); im.onload = () => im.classList.add('on'); im.src = ev.data; } break; }
       case 'follows': follows = ev.items || []; renderFollows(ev.checking); break;
       case 'about': $('aboutLine').textContent = `${ev.version || ''}（${ev.build || ''}）・${tr('開源')}`; break;
+      case 'appUpdate':                  // 有新版：關於那列多一句、多一顆「下載新版」
+        $('aboutLine').textContent = $('aboutLine').textContent.split('・')[0] + `・${tr('有新版')} ${ev.version}`;
+        $('updBtn').textContent = `${tr('下載新版')} ${ev.version}`;
+        $('updBtn').style.display = '';
+        break;
       case 'extra': if (ev.sheet) { lastSheet = ev.sheet; if (mode === 'done') openLabel(); } break;
       case 'theme': {
         const m = ev.mode || 'system';
@@ -809,13 +820,13 @@
         $('cardIcon').insertAdjacentHTML('afterbegin', iconFor(evKind));
         $('cardTitle').textContent = curName || ev.label || ''; $('cardUrl').textContent = ev.label || ''; $('cardUrl').classList.remove('url');
         if (X()?.onSource?.(ev) === true) break;   // 影片自己擺進度
-        if (total > 0) { setText(tr('{a}／{b} 張', { a: 0, b: total })); running(tr('下載中'), 0); }
-        else { setText(tr('{n} 張', { n: 0 })); $('sub').innerHTML = tr('邊讀邊抓，抓的是原始尺寸。'); resolving(true); }
+        if (total > 0) { setText(count(0, total)); running(tr('下載中'), 0); }
+        else { setText(count(0)); $('sub').innerHTML = tr('邊讀邊抓，抓的是原始尺寸。'); resolving(true); }
         break;
       }
       case 'item':
-        if (total > 0) { setText(tr('{a}／{b} 張', { a: ev.index, b: total })); prog(ev.index / total); running(tr('下載中'), ev.index / total); }
-        else setText(tr('{n} 張', { n: ev.index }));
+        if (total > 0) { setText(count(ev.index, total)); prog(ev.index / total); running(tr('下載中'), ev.index / total); }
+        else setText(count(ev.index));
         break;
       case 'progress': {
         let what = tr('下載中');
@@ -876,6 +887,7 @@
     else if (allSmall) lines.push(tr('這一頁的圖都太小（像圖示、按鈕），沒有存。'));
     else if (!du && !allFail) lines.push(tr('全部 {n} {u}都已經在「{w}」裡。', { n: sk, u, w: esc(where) }));
     if (n > 1 && ev.videos) lines.push(tr('其中 {n} 支是影片。', { n: ev.videos }));   // 圖版裡的影片 pin 存的是影片本身（放在上面那串 if／else 的外面）
+    if (n > 1 && ev.audios && ev.audios < n) lines.push(tr('其中 {n} 個是音檔。', { n: ev.audios }));   // 網頁上圖和音檔混著（全是音檔時單位已經是「個」）
     const minor = [sk && n ? tr('另外 {n} {u}略過（抓過或太小）', { n: sk, u }) : '', fl ? tr('{n} {u}抓不到', { n: fl, u }) : ''].filter(Boolean).join(tr('，'));
     if (minor) lines.push(minor + (LANG === 'en' ? '.' : '。'));
     if (du) lines.push(ev.dup_saved ? tr('其中 {n} 張跟之前抓的一模一樣', { n: du }) : tr('{n} 張跟之前抓的一模一樣，沒再存一份', { n: du }));
@@ -949,6 +961,7 @@
   $('bmCopy').onclick = () => send('copyBookmarklet');
   document.querySelectorAll('#seg button').forEach(b => b.onclick = () => send('theme', { mode: b.dataset.theme }));
   document.querySelectorAll('#langSeg button').forEach(b => b.onclick = () => send('lang', { lang: b.dataset.lang }));
+  $('updBtn').onclick = () => send('appUpdate');
   $('docTerms').onclick = () => send('openDoc', { doc: 'terms' });
   $('docPrivacy').onclick = () => send('openDoc', { doc: 'privacy' });
 

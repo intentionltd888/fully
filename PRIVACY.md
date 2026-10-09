@@ -12,8 +12,9 @@ Fully 沒有自己的伺服器、沒有帳號、沒有遙測。下面是它實�
    - 設定裡可以改成「關」（完全不看剪貼簿）或「直接抓」。
 3. **你選擇追蹤的網頁。** 在完成畫面按「追蹤」之後，Fully 開著時每 6 小時回去看一次那一頁（或那個影片清單），只存新的。停止方法：最近抓的 → 追蹤中 → 那一列的 ✕。「現在檢查」可以手動看一次。
 4. **影片引擎的更新（預設開啟，可以關）。** 影片網站常改版，所以 Fully 每天在背景向 GitHub 問一次影片引擎（開源的 yt-dlp）有沒有新版，有就下載官方發行版換上（會先核對官方的檢查碼）。另外兩種情況也會連 GitHub：抓某些影片網站時，引擎會下載官方發行的解挑戰元件；某個影片抓不動、看起來是網站剛改版時，會改用引擎的搶先版再試一次。這幾次都只連 GitHub，不送出你的任何資料。設定 →「自動跟上網站改版」可以關掉每天的檢查。
+5. **有沒有新版的 Fully。** Fully 開著時，每天向 GitHub 問一次 Fully 公開倉的最新發行版號，只讀那個版號、不送出你的任何資料。比你手上的新，就發一次通知，設定 →「關於 Fully」也會出現「下載新版」；按了才用瀏覽器下載新的 DMG，Fully 不會自己換掉自己。
 
-除了以上四項，Fully 不連任何網路：除了影片引擎，Fully 本身沒有自動更新；沒有使用分析、沒有當機回報、沒有廣告，也不連我們的伺服器。Fully 的新版會放在官網與公開倉，下載新的 DMG 蓋過去就好。
+除了以上五項，Fully 不連任何網路：除了影片引擎，Fully 本身不會自動更新；沒有使用分析、沒有當機回報、沒有廣告，也不連我們的伺服器。Fully 的新版會放在官網與公開倉，下載新的 DMG 蓋過去就好。
 
 ### 留在你電腦上的
 - **存下的圖片與影片**：預設在 `~/Downloads/Fully`，照來源自動開子資料夾；位置可以在設定裡改。每個檔案會記下它的來源網址（Finder 的「來源」欄）。
@@ -57,8 +58,9 @@ Fully has no server, no account and no telemetry. Here is everything it actually
    - In Settings you can switch this to "Off" (the clipboard is not watched at all) or "Download right away".
 3. **Pages you choose to follow.** After you press "Follow" on the done screen, Fully checks that page (or that playlist) every 6 hours while it is running and saves only what's new. To stop: Recent → Following → the ✕ on that row. "Check now" checks once by hand.
 4. **Video engine updates (on by default, can be turned off).** Video sites change often, so once a day Fully asks GitHub in the background whether there is a new version of its video engine (the open-source yt-dlp) and, if so, downloads the official release (after checking the official checksum). Two other cases also reach GitHub: for some video sites the engine downloads an official challenge-solving component, and when a video won't download in a way that looks like the site just changed, Fully retries with the engine's preview build. These only talk to GitHub and send none of your data. Settings → "Keep up with site changes" turns off the daily check.
+5. **Whether a new Fully is out.** While Fully is running it asks GitHub once a day for the latest release number of Fully's public repository; it only reads that number and sends none of your data. If it's newer than yours, you get one notification and Settings → "About Fully" shows "Get the new version"; the new DMG downloads in your browser only when you click, and Fully never replaces itself.
 
-Apart from these four, Fully makes no network connections: other than the video engine, Fully itself never updates automatically; no analytics, no crash reports, no ads, and nothing sent to us. New versions of Fully are posted on the website and in the public repository; download the new DMG to update.
+Apart from these five, Fully makes no network connections: other than the video engine, Fully itself never updates automatically; no analytics, no crash reports, no ads, and nothing sent to us. New versions of Fully are posted on the website and in the public repository; download the new DMG to update.
 
 ### What stays on your Mac
 - **Saved images and videos**: `~/Downloads/Fully` by default, sorted into subfolders by source; you can change the location in Settings. Each file records the address it came from (Finder's "Where from").

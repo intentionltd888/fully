@@ -155,6 +155,7 @@ final class ClipCard: NSObject, WKScriptMessageHandler {
     static func metaLine(_ p: [String: Any]) -> String {
         var bits: [String] = []
         let count = p["count"] as? Int ?? 0
+        if let a = audioMeta(p, count: count) { return a }     // 音檔：幾個、多長或多大
         if let v = videoMeta(p, count: count) { return v }     // 影片／清單：長度、幾支、最高畫質
         if count > 1 {
             bits.append(L("\(count) 張", "\(count) images"))
@@ -164,6 +165,26 @@ final class ClipCard: NSObject, WKScriptMessageHandler {
         }
         if bits.isEmpty { return L("可以抓下來", "Ready to grab") }
         return bits.joined(separator: "・")
+    }
+
+    /// 音檔（引擎的 audios＝其中幾個是音檔）：全是音檔講幾個或多長／多大；網頁上圖和音檔混著就兩個都講。沒有音檔回 nil
+    private static func audioMeta(_ p: [String: Any], count: Int) -> String? {
+        guard let a = p["audios"] as? Int, a > 0 else { return nil }
+        if a < count {
+            var bits = [L("\(count - a) 張", "\(count - a) images"), L("\(a) 個音檔", "\(a) audio files")]
+            if let w = p["w"] as? Int, let h = p["h"] as? Int, w > 0, h > 0 { bits.append(L("最大 \(w) × \(h)", "up to \(w) × \(h)")) }
+            return bits.joined(separator: "・")
+        }
+        if a > 1 || p["list"] as? Bool == true { return L("\(a) 個音檔", "\(a) audio files") }
+        if let d = p["duration"] as? Double ?? (p["duration"] as? Int).map(Double.init), d > 0 {
+            let s = Int(d)
+            return L("音檔・", "Audio · ") + (s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s % 3600 / 60, s % 60)
+                                                       : String(format: "%d:%02d", s / 60, s % 60))
+        }
+        if let b = p["bytes"] as? Int, b > 0 {
+            return L("音檔・", "Audio · ") + (b >= 1_048_576 ? String(format: "%.1f MB", Double(b) / 1_048_576) : "\(b / 1024) KB")
+        }
+        return L("音檔", "Audio file")
     }
 
     /// 影片線：清單＝幾支、單支＝長度；有畫面尺寸就講最高畫質。不是影片回 nil（走圖片那套）

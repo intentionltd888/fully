@@ -93,5 +93,47 @@ _t(not _rows[2].get("dash") and _rows[2]["url"] == "https://p/720b.mp4", "清單
 _t(all(r["id"].isdigit() and len(r["id"]) >= 15 for r in _rows), "id 是每一項自己的 pk（抓過的會跳過）")
 _t(TH.post_rows({"code": "Y", "media_type": 19, "user": {"username": "a"}}) == [], "純文字貼文沒有檔")
 
+
+# 網頁上的音檔（audio）：檔頭、每個播放器取一個、Podcast 集數標題、連結只在沒有播放器時才算。手寫樣本不連網。
+import audio as AU
+import core as _C
+
+_pad = b"\0" * 2048
+_t(_C.is_audio(b"ID3" + _pad) and _C.is_audio(b"fLaC" + _pad) and _C.is_audio(b"RIFF\0\0\0\0WAVE" + _pad)
+   and _C.is_audio(b"\0\0\0\x20ftypM4A " + _pad) and not _C.is_audio(b"<!doctype html>" + _pad) and not _C.is_audio(b"ID3"), "音檔檔頭")
+_t(_C.sniff_audio_ext(b"OggS" + b"\0" * 24 + b"OpusHead") == ".opus" and _C.sniff_audio_ext(b"\xff\xf1\x50") == ".aac"
+   and _C.sniff_audio_ext(b"\xff\xfb\x90") == ".mp3" and _C.sniff_audio_ext(b"FORM\0\0\0\0AIFF") == ".aiff", "看檔頭給副檔名")
+_t(AU.is_audio_file("https://a.b/x/Song%20One.MP3?dl=1") and not AU.is_audio_file("https://a.b/x.mp4"), "直接指到音檔")
+
+_page = ('<audio controls><source src="https://cdn.x/orig.ogg" type="audio/ogg"><source src="/t/orig.ogg.mp3" type="audio/mpeg"></audio>'
+         '<audio src="track2.m4a"></audio><audio><source src="https://cdn.x/sil-100.mp3"></audio>'
+         '<a href="/wiki/Talk:Song.ogg">討論</a><a href="/files/extra.mp3">extra</a>'
+         '<meta property="og:audio" content="https://cdn.x/og.mp3">')
+_got = [u for u, _ in AU.scan(_page, "https://site.test/page")]
+_t(_got == ["https://cdn.x/orig.ogg", "https://site.test/track2.m4a", "https://cdn.x/og.mp3"],
+   f"每個播放器一個、跳過靜音檔、有播放器就不看連結：{_got}")
+_links = AU.scan('<a href="a.mp3" download="第一首">x</a><a href="/wiki/File:b.ogg">說明頁</a><a href="b.wav">y</a>', "https://s.test/d/")
+_t(_links == [("https://s.test/d/a.mp3", "第一首"), ("https://s.test/d/b.wav", "")], f"沒有播放器才看下載連結，帶冒號的說明頁不算：{_links}")
+_rss = ('<rss><channel><title>節目</title><item><title><![CDATA[第 12 集：開場]]></title>'
+        '<enclosure url="https://cdn.p/e12.mp3" type="audio/mpeg" length="1"/></item>'
+        '<item><title>第 11 集</title><enclosure url="https://cdn.p/e11.m4a" type="audio/x-m4a"/></item></channel></rss>')
+_t(AU.scan(_rss, "https://feed.test/rss") == [("https://cdn.p/e12.mp3", "第 12 集：開場"), ("https://cdn.p/e11.m4a", "第 11 集")],
+   "Podcast 訂閱：每一集用自己的標題")
+_ar = AU.rows_for([("https://cdn.p/e12.mp3", "第 12 集")], "https://feed.test/rss")
+_t(_ar[0]["audio"] and len(_ar[0]["id"]) == 16 and _ar[0]["title"] == "第 12 集", "音檔下載清單：id 16 碼、帶 audio 旗標")
+
+# 圖版網址（pin_grab）：個人頁、分頁、分區、站上的功能頁。只看網址，不連網。
+import pin_grab as PG
+
+_t(PG.handles("https://board.test/user/") and PG.profile_tab("https://board.test/user/") == ("user", "boards"), "個人頁＝每個圖版")
+_t(PG.profile_tab("https://board.test/user/_saved/") == ("user", "boards")
+   and PG.profile_tab("https://board.test/user/_created/") == ("user", "created"), "個人頁的分頁")
+_t(PG.handles("https://board.test/user/board/sec/") and PG.profile_tab("https://board.test/user/board/") is None
+   and PG.profile_tab("https://board.test/pin/123/") is None, "圖版、分區、單張 pin 不是個人頁")
+_t(not PG.handles("https://board.test/explore/") and not PG.handles("https://board.test/search/pins/?q=x")
+   and not PG.handles("https://board.test/"), "功能頁與搜尋交回去")
+_pr = PG.pin_rows({"id": "11", "images": {"orig": {"url": "https://cdn.test/a.jpg", "width": 9, "height": 9}}})
+_t(len(_pr) == 1 and _pr[0]["id"] == "11" and "sub" not in _pr[0], "一般 pin 一筆、沒有子資料夾")
+
 print(f"{len(CASES) - bad}/{len(CASES)} 通過")
 sys.exit(1 if bad else 0)

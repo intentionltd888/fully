@@ -161,7 +161,8 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         var l: [String] = []
         return l
     }()
-    private static let fileExts = ["jpg", "jpeg", "png", "webp", "gif", "avif", "heic", "svg", "mp4", "mov", "m4v", "webm", "m3u8"]
+    private static let fileExts = ["jpg", "jpeg", "png", "webp", "gif", "avif", "heic", "svg", "mp4", "mov", "m4v", "webm", "m3u8",
+                                   "mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aif", "aiff", "caf", "weba"]
     static func looksLikeMedia(_ u: String) -> Bool {
         guard let url = URL(string: u), let host = url.host?.lowercased() else { return false }
         if mediaHosts.contains(where: { host == $0 || host.hasSuffix("." + $0) || ($0.hasSuffix(".") && host.contains($0)) }) { return true }
@@ -181,6 +182,7 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
 
     // ── 剪貼簿監看（預設「問一聲」＝預覽卡）──
     private var watchTimer: Timer?
+    private var appUpdateTimer: Timer?
     private var lastPasteCount = NSPasteboard.general.changeCount
     private var recentURLs: [String] = []
     private static let selfMarker = NSPasteboard.PasteboardType("ltd.intention.fully.self")   // 我們自己寫進剪貼簿的，不要又被監看接走
@@ -643,6 +645,7 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
                   "build": info?["CFBundleVersion"] as? String ?? ""])
             if selftest == nil { emit(["type": "history", "items": Array(history.prefix(8))]); pushFollows() }
             engineReady()
+            appUpdateReady()
             // 首啟精靈：沒跑過（或 --wizard）就蓋在主面板上，而且**面板要自己打開**
             if selftest == nil, (!wizardDone || forceWizard) {
                 emit(["type": "wizard", "show": true, "page": wizardPage, "clip": Prefs.clipMode, "agreed": Prefs.agreed,
@@ -770,6 +773,9 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         case "openDoc":
             openDoc(body["doc"] as? String ?? "terms")
 
+        case "appUpdate":                      // 設定頁「下載新版」
+            if let u = URL(string: AppUpdate.download) { NSWorkspace.shared.open(u) }
+
         case "start":
             let urls = (body["urls"] as? [String])
                 ?? (body["url"] as? String).map { [$0] } ?? []
@@ -876,6 +882,25 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         default:
             break
         }
+    }
+
+    /// 有沒有新版的 Fully：開著就每 6 小時問一次（AppUpdate 自己會擋成一天一次）。有新版＝設定頁出現「下載新版」，同一版只通知一次。
+    private func appUpdateReady() {
+        guard selftest == nil, !isSnapshotRun else { return }
+        let ask: () -> Void = { [weak self] in
+            AppUpdate.check { v in
+                guard let self, let v else { return }
+                self.emit(["type": "appUpdate", "version": v])
+                if AppUpdate.shouldNotify(v) {
+                    self.notify(L("Fully 有新版 \(v)", "Fully \(v) is available"),
+                                body: L("點這裡下載。打開後雙擊裡面的 Fully 就會換掉舊的，設定都會留著。",
+                                        "Click to download. Open it and double-click Fully to replace this one — your settings stay."),
+                                link: AppUpdate.download)
+                }
+            }
+        }
+        ask()
+        appUpdateTimer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in ask() }
     }
 
     private func engineReady() {
@@ -1073,8 +1098,9 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
             let i = ev["index"] as? Int ?? 0
             frac = total > 0 ? Double(i) / Double(total) : -1
             if job.card {
+                let u = (curSource["kind"] as? String) == "audio" ? "個" : "張"      // 音檔論「個」
                 ClipCard.shared.progress(url: job.url, frac: frac ?? -1,
-                                         text: total > 0 ? L("\(i)／\(total) 張", "\(i) of \(total)") : L("\(i) 張", "\(i) saved"))
+                                         text: total > 0 ? L("\(i)／\(total) \(u)", "\(i) of \(total)") : L("\(i) \(u)", "\(i) saved"))
             }
         case "error":
             lastErr = ev["message"] as? String ?? ""
@@ -1101,7 +1127,8 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         var cardDetail = Self.proofLine(ev, compact: true)
         if added > 1 {       // 一整批：卡片那行比較窄，只講張數與最大尺寸（幾倍留給完成畫面）
             let w = ev["w"] as? Int ?? 0, h = ev["h"] as? Int ?? 0
-            cardDetail = L("\(added) 張", "\(added) saved") + (w > 0 ? L("・最大 \(w) × \(h)", " · up to \(w) × \(h)") : "")
+            let u = (ev["audios"] as? Int ?? 0) >= added ? "個" : "張"            // 全是音檔論「個」
+            cardDetail = L("\(added) \(u)", "\(added) saved") + (w > 0 ? L("・最大 \(w) × \(h)", " · up to \(w) × \(h)") : "")
         } else if added == 0 {
             cardDetail = Self.nothingLine(ev)
         }
@@ -1469,7 +1496,8 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
 
     // MARK: 通知
 
-    private func notify(_ title: String, body: String, file: String? = nil, folder: String? = nil, thumb: String? = nil) {
+    private func notify(_ title: String, body: String, file: String? = nil, folder: String? = nil, thumb: String? = nil,
+                        link: String? = nil) {
         guard selftest == nil, !isSnapshotRun else { return }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
@@ -1482,6 +1510,7 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
                 var info: [String: String] = [:]
                 if let file { info["file"] = file }
                 if let folder { info["folder"] = folder }
+                if let link { info["link"] = link }
                 c.userInfo = info
                 if let att, let a = try? UNNotificationAttachment(identifier: "thumb", url: att, options: nil) { c.attachments = [a] }
                 center.add(UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
@@ -1491,12 +1520,14 @@ final class Controller: NSObject, NSApplicationDelegate, WKScriptMessageHandler,
         }
     }
 
-    /// 點通知＝直接在 Finder 顯示那個檔
+    /// 點通知＝直接在 Finder 顯示那個檔（新版通知＝打開下載連結）
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler done: @escaping () -> Void) {
         let info = response.notification.request.content.userInfo
         DispatchQueue.main.async {
-            if let f = info["file"] as? String, FileManager.default.fileExists(atPath: f) {
+            if let l = info["link"] as? String, l.hasPrefix("https://"), let u = URL(string: l) {
+                NSWorkspace.shared.open(u)
+            } else if let f = info["file"] as? String, FileManager.default.fileExists(atPath: f) {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: f)])
             } else if let d = info["folder"] as? String, FileManager.default.fileExists(atPath: d) {
                 NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: d)

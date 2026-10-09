@@ -192,10 +192,11 @@ def existing_ids(folder):
     return ids
 
 
-def fetch_bytes(url, referer=None, video=False):
+def fetch_bytes(url, referer=None, video=False, audio=False):
     """抓下來先驗證再落地，避免留下寫壞的半截檔（本工具不做任何刪檔）。
     referer：網頁掃圖帶原頁網址（有些 CDN 擋沒有來源頁的請求）；沒給就不帶。
-    video：來源模組說這一筆是影片檔（例如圖版裡的影片 pin）——驗的是 mp4／mov 的檔頭，不是圖片的。"""
+    video：來源模組說這一筆是影片檔（例如圖版裡的影片 pin）——驗的是 mp4／mov 的檔頭，不是圖片的。
+    audio：這一筆是音檔——驗音檔的檔頭。"""
     headers = {"User-Agent": ua_for(url)}
     if referer:
         headers["Referer"] = iri(referer)
@@ -204,7 +205,11 @@ def fetch_bytes(url, referer=None, video=False):
     def once():
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
             return resp.read()
-    blob = with_retry(once, "下載影片" if video else "下載圖片")
+    blob = with_retry(once, "下載影片" if video else ("下載音檔" if audio else "下載圖片"))
+    if audio:
+        if not is_audio(blob):
+            raise ValueError(T("不是音檔", "not an audio file"))
+        return blob
     if video:
         if not is_mp4(blob):
             raise ValueError(T("不是影片檔", "not a video"))
@@ -220,6 +225,36 @@ def fetch_bytes(url, referer=None, video=False):
             or is_isobmff or is_svg(blob)):
         raise ValueError(T("不是圖片檔", "not an image"))
     return blob
+
+
+def is_audio(b):
+    """常見音檔的檔頭：MP3（ID3 或 MPEG 同步字）、AAC（ADTS）、FLAC、OGG／Opus、WAV、AIFF、M4A（ftyp）、CAF、WebM。"""
+    if len(b) < 1024:
+        return False
+    return (b[:3] == b"ID3" or (b[0] == 0xFF and (b[1] & 0xE0) == 0xE0)
+            or b[:4] in (b"fLaC", b"OggS", b"caff", b"\x1aE\xdf\xa3") or b[4:8] == b"ftyp"
+            or (b[:4] == b"RIFF" and b[8:12] == b"WAVE") or (b[:4] == b"FORM" and b[8:12] in (b"AIFF", b"AIFC")))
+
+
+def sniff_audio_ext(b):
+    """網址看不出副檔名時，照檔頭給一個。"""
+    if b[:4] == b"fLaC":
+        return ".flac"
+    if b[:4] == b"OggS":
+        return ".opus" if b"OpusHead" in b[:64] else ".ogg"
+    if b[:4] == b"RIFF":
+        return ".wav"
+    if b[:4] == b"FORM":
+        return ".aiff"
+    if b[:4] == b"caff":
+        return ".caf"
+    if b[:4] == b"\x1aE\xdf\xa3":
+        return ".weba"
+    if b[4:8] == b"ftyp":
+        return ".m4a"
+    if b[0] == 0xFF and (b[1] & 0xF6) == 0xF0:  # ADTS（layer 位元是 00）
+        return ".aac"
+    return ".mp3"
 
 
 def is_mp4(b):
@@ -262,6 +297,7 @@ def is_svg(b):
 
 
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".heic", ".bmp", ".tiff", ".svg")
+AUDIO_EXTS = (".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".oga", ".opus", ".aif", ".aiff", ".caf", ".weba")
 
 
 def sniff_ext(b):
@@ -572,6 +608,7 @@ class DLResult:
     def __init__(self):
         self.ok = self.skipped = self.failed = self.dups = self.small = 0
         self.videos = 0             # 存下來的裡面有幾支是影片（圖版裡的影片 pin）
+        self.audios = 0             # 幾個是音檔（網頁上的音檔）
         self.files, self.best, self.dup_of, self.page_w = [], (0, 0), None, None
         self.best_file = None       # 最大那張的路徑：一整批的縮圖用它（第一張常是地圖、標誌）
 
@@ -584,12 +621,26 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
     實測 12 張 1280 寬的圖：一張一張 21.3 秒 → 同時 6 張 3.9 秒。
     min_bytes：小於這個大小的直接不落地（icon／sprite）。圖片先讀進記憶體驗過才寫檔，不會留半截檔、不做任何刪檔。
     dedup：HashIndex——一模一樣的圖已經存過就不再存一份（算「已經有了」）。
-    seen／only_new：追蹤來源用——抓過的 id 記在資料夾的 .fully-seen，only_new 時直接跳過。"""
+    seen／only_new：追蹤來源用——抓過的 id 記在資料夾的 .fully-seen，only_new 時直接跳過。
+    row 的 sub：存進 folder 底下這個子資料夾（一個帳號的每個圖版各一夾）；n：檔名序號（子資料夾裡各自從 1 數）。"""
     os.makedirs(folder, exist_ok=True)
     have = existing_ids(folder)
     total = len(rows)
     res = DLResult()
     sems, sem_lock, stop = {}, threading.Lock(), threading.Event()
+    subs = {}
+
+    def where(r):
+        """這一筆存到哪個資料夾、那裡已經有哪些 id。"""
+        sub = r.get("sub")
+        if not sub:
+            return folder, have
+        with sem_lock:
+            if sub not in subs:
+                d = os.path.join(folder, sub)
+                os.makedirs(d, exist_ok=True)
+                subs[sub] = (d, existing_ids(d))
+            return subs[sub]
 
     def host_sem(u):
         h = urllib.parse.urlparse(u).hostname or ""
@@ -603,11 +654,13 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
         if stop.is_set():
             return "bad", T("停下來了", "stopped")
         rid = str(r["id"])
-        if rid in have or (only_new and seen is not None and rid in seen.ids):
+        here, have_here = where(r)
+        if rid in have_here or (only_new and seen is not None and rid in seen.ids):
             return "skip", None
         blob = used = src_file = None
         last = None
         vid = bool(r.get("video"))
+        aud = bool(r.get("audio"))
         for cand in [r["url"]] + list(r.get("alts") or []):
             try:
                 with host_sem(cand):
@@ -616,14 +669,14 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
                     elif vid and r.get("dash") and cand == r["url"]:
                         blob, src_file = fetch_dash(cand, *r["dash"])
                     else:
-                        blob = fetch_bytes(cand, r.get("referer"), video=vid)
+                        blob = fetch_bytes(cand, r.get("referer"), video=vid, audio=aud)
                 used = cand
                 break
             except Exception as e:
                 last = e
         if blob is None:
             return "bad", str(last)[:60]
-        if min_bytes and not vid and len(blob) < min_bytes:
+        if min_bytes and not vid and not aud and len(blob) < min_bytes:
             # 檔案小不一定是圖示：有些原圖本來就只有 400 px、13 KB（Wikimedia 上的老照片）——量得到而且夠大就照存
             sw, sh = image_size(blob)
             if not (sw and sh and max(sw, sh) >= 400 and min(sw, sh) >= 200):
@@ -638,11 +691,14 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
         ext = os.path.splitext(urllib.parse.urlparse(used).path)[1].lower()
         if vid:
             ext = ext if ext in (".mp4", ".mov", ".m4v") else ".mp4"
+        elif aud:
+            ext = ext if ext in AUDIO_EXTS else sniff_audio_ext(blob)
         elif ext not in IMAGE_EXTS:
             ext = sniff_ext(blob)
         slug = safe_name(r.get("title") or "")
-        stem = f"{i:03d}_{slug}_{rid}" if slug else f"{i:03d}_{rid}"
-        path = os.path.join(folder, stem + ext)
+        num = r.get("n") or i
+        stem = f"{num:03d}_{slug}_{rid}" if slug else f"{num:03d}_{rid}"
+        path = os.path.join(here, stem + ext)
         try:
             moved = False
             if src_file:                            # 串流影片在暫存區已經是一個完整的檔：搬過去，不留第二份
@@ -659,7 +715,7 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
                 stop.set()
                 return "nospace", None
             return "bad", str(e)[:60]
-        w, h = (None, None) if vid else image_size(blob)
+        w, h = (None, None) if (vid or aud) else image_size(blob)
         if not w:
             w, h = r.get("w"), r.get("h")
         if dedup is not None:
@@ -681,6 +737,7 @@ def download(rows, folder, min_bytes=0, workers=6, per_host=4, dedup=None, seen=
                 path, w, h, size, r = info
                 res.ok += 1
                 res.videos += 1 if r.get("video") else 0
+                res.audios += 1 if r.get("audio") else 0
                 res.files.append(path)
                 if w and h and w * h > res.best[0] * res.best[1]:
                     res.best = (w, h)
@@ -760,6 +817,8 @@ def img_done(res):
     d = {"dups": res.dups, "small": res.small}
     if res.videos:
         d["videos"] = res.videos        # 一批裡有幾支是影片（完成畫面另外講）
+    if res.audios:
+        d["audios"] = res.audios        # 幾個是音檔（全是音檔時介面單位用「個」）
     if res.best[0]:
         d.update(w=res.best[0], h=res.best[1], dims=f"{res.best[0]}×{res.best[1]}")
         if res.page_w:

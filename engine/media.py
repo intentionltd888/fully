@@ -5,6 +5,7 @@ media — 公開版掛進 grab.py 的影片線與圖版解析。
 認得的影片網址直接交給 video.py（yt-dlp：最高畫質＋QuickTime 可播保證、只要聲音、每個鏡頭截圖、標題與留言）；
 圖版與單張 pin 交給 pin_grab.py（整個圖版讀到底、影片 pin 存影片本身、多頁的 pin 每一頁都存）；
 Threads 貼文與個人頁交給 threads_grab.py（圖片原尺寸、影片最高畫質、輪播每一項、作者自己的串文）；
+直接指到音檔的網址交給 audio.py（原檔照存），音樂與 Podcast 平台走影片線的「只要聲音」；
 其他網址照常當網頁掃圖，頁面掃不到圖、或只拿得到分享預覽圖時，再問一次影片線。
 只處理公開看得到的內容：不帶任何帳號資料。
 grab.py 認得的鉤子：SWITCHES／VALUED／take_flags／media_only／session／kind_of／probe／probe_fallback／
@@ -16,6 +17,7 @@ from core import T, _host
 import video as VIDEO
 import pin_grab as PIN
 import threads_grab as THREADS
+import audio as AUDIO
 
 
 # ─── 旗標 ────────────────────────────────────────────────────────────────
@@ -46,6 +48,8 @@ def kind_of(url):
         return "board"
     if THREADS.claims(host) and THREADS.handles(url):
         return "post"
+    if AUDIO.is_audio_file(url) or VIDEO.is_audio_host(host):
+        return "audio"
     return "video" if VIDEO.is_video_host(host) or VIDEO.is_video_file(url) else None
 
 
@@ -57,6 +61,8 @@ def probe(kind, url):
         return PIN.probe(url)
     if kind == "post":
         return THREADS.probe(url)
+    if kind == "audio":
+        return AUDIO.probe(url)
     return None
 
 
@@ -75,6 +81,8 @@ def dispatch(url, dest, kind, sess):
     opt = pg.OPT
     if kind == "video":
         VIDEO.grab_video(url, dest, audio=opt["audio"], data=opt["data"], frames=opt["frames"])
+        return True
+    if kind == "audio" and AUDIO.grab(url, dest):
         return True
     if opt["data"] or opt["frames"]:
         pg.emit(type="notice", message=T("這個來源沒有「標題與留言／每個鏡頭截圖」，照一般方式抓原始尺寸",

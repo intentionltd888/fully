@@ -11,9 +11,11 @@ pin_grab — Pinterest 圖版解析（兩版共用）。
 支援：
   https://pin.it/xxxxxxx                 短網址
   https://www.pinterest.com/user/board/  圖版（整個讀到底，一次讀 100 張）
-  https://www.pinterest.com/user/board/section/  圖版分區
+  https://www.pinterest.com/user/board/section/  圖版分區（只抓那個分區）
   https://www.pinterest.com/pin/1234567/ 單張 pin
-只讀公開的圖版與 pin，不帶任何帳號資料。搜尋結果與個人頁不歸這裡管（handles() 回 False）。
+  https://www.pinterest.com/user/        個人頁（＝/user/_saved/）：每個公開圖版都抓，一個圖版一個資料夾
+  https://www.pinterest.com/user/_created/  這個帳號自己建立的 pin
+只讀公開的圖版與 pin，不帶任何帳號資料。搜尋結果不歸這裡管（handles() 回 False）。
 """
 
 import json
@@ -40,18 +42,40 @@ def claims(host):
     return "pinterest." in host or host == "pin.it"
 
 
+# 第一段是這些的不是帳號（站上的功能頁）
+NOT_USER = {"search", "ideas", "today", "settings", "business", "_", "categories", "topics", "explore", "videos",
+            "shopping", "news_hub", "homefeed", "following", "notifications", "about", "help", "password",
+            "signup", "login", "logout", "resource", "pin-builder", "pin-creation-tool", "convert", "edit", "_tools"}
+# 個人頁的分頁 → 抓什麼
+PROFILE_TABS = {"_saved": "boards", "_boards": "boards", "_created": "created", "_pins": "pins"}
+
+
+def _segs(url):
+    return [urllib.parse.unquote(s) for s in urllib.parse.urlparse(url).path.split("/") if s]
+
+
 def handles(url):
-    """圖版、圖版分區、單張 pin、短網址才歸這裡；搜尋結果、個人頁、其他頁面交回去。"""
+    """圖版、圖版分區、單張 pin、個人頁、短網址才歸這裡；搜尋結果與其他頁面交回去。"""
     if _host(url) == "pin.it":
         return True
-    segs = [s for s in urllib.parse.urlparse(url).path.split("/") if s]
+    segs = _segs(url)
     if not segs:
         return False
     if segs[0] == "pin":
         return len(segs) >= 2
-    if segs[0] in ("search", "ideas", "today", "settings", "business", "_", "categories", "topics"):
-        return False
-    return len(segs) >= 2          # /使用者/圖版/（/分區/）；只有一段＝個人頁
+    return segs[0] not in NOT_USER     # /帳號/、/帳號/_saved/、/帳號/圖版/（/分區/）
+
+
+def profile_tab(url):
+    """個人頁回 (帳號, 抓什麼)；不是個人頁回 None。"""
+    segs = _segs(url)
+    if not segs or segs[0] in NOT_USER or segs[0] == "pin":
+        return None
+    if len(segs) == 1:
+        return segs[0], "boards"
+    if len(segs) == 2 and segs[1] in PROFILE_TABS:
+        return segs[0], PROFILE_TABS[segs[1]]
+    return None
 
 
 def api(sess, resource, options, source_url, handler):
@@ -188,8 +212,19 @@ def pin_rows(pin):
 
 def collect_from_board(sess, final_url, html, max_pages=None):
     """max_pages：預覽卡只要第一頁（名字、張數、縮圖）就夠，不用把整個板翻完。"""
-    m = (re.search(r'\[\\"board_id\\",\\"(\d+)\\"\]', html)
-         or re.search(r'"board_id"\s*:\s*\\?"(\d+)\\?"', html))
+    def board_id_in(h):
+        return (re.search(r'\[\\"board_id\\",\\"(\d+)\\"\]', h)
+                or re.search(r'"board_id"\s*:\s*\\?"(\d+)\\?"', h))
+    m = board_id_in(html)
+    segs = _segs(final_url)
+    if not m and len(segs) >= 3 and not segs[2].startswith("_"):
+        # 分區頁的 HTML 不帶 board_id：回上一層的圖版頁拿
+        try:
+            q = urllib.parse.quote
+            _, parent = sess.get_page(f"https://www.pinterest.com/{q(segs[0])}/{q(segs[1])}/")
+            m = board_id_in(parent)
+        except Exception:
+            m = None
     if not m:
         # 圖版不存在 / 不公開的圖版時，Pinterest 照樣回 HTTP 200 但頁面沒有 board_id
         return None, None, False, 0
@@ -222,26 +257,70 @@ def collect_from_board(sess, final_url, html, max_pages=None):
                     name = cand
                     break
 
-    rows, seen, bookmark, pins, idle = [], set(), None, 0, 0
-    collect_from_board.cut = False
-    for page_no in range(max_pages or SAFETY_PAGES):
-        opts = {"add_vase": True, "board_id": board_id,
-                "field_set_key": "react_grid_pin", "filter_section_pins": False,
-                "is_react": True, "prepend": False, "page_size": PAGE_SIZE,
-                "redux_normalize_feed": True, "gated": False}
+    resource, handler, opts = "BoardFeedResource", "www/[username]/[slug].js", _board_opts(board_id)
+
+    # 分區網址只抓那個分區（圖版的清單含全部分區的 pin）
+    if len(segs) >= 3 and not segs[2].startswith("_"):
+        sec = find_section(sess, board_id, segs[2], source_url)
+        if sec:
+            name = f"{name} - {sec['title']}" if name and sec.get("title") else (sec.get("title") or name)
+            expected = int(sec.get("pin_count") or 0)
+            resource, handler = "BoardSectionPinsResource", "www/[username]/[slug]/[section_slug].js"
+            opts = {"section_id": str(sec["id"]), "field_set_key": "react_grid_pin",
+                    "is_react": True, "redux_normalize_feed": True, "page_size": SECTION_PAGE_SIZE}
+        else:
+            emit(type="notice", message=T("找不到這個分區，改抓整個圖版", "Couldn't find that section — grabbing the whole board"))
+
+    rows, pins, cut = _feed(sess, resource, opts, source_url, handler, max_pages)
+    collect_from_board.cut = cut
+    collect_from_board.pins = pins
+    if rows is None:
+        return None, name, True, expected
+    return rows, name, True, expected
+
+
+SECTION_PAGE_SIZE = 50     # 分區清單一次最多 50（給 100 會回 400）
+
+
+def find_section(sess, board_id, slug, source_url):
+    """分區網址最後一段是分區的 slug：問圖版有哪些分區，對到 slug 才知道它的 id。"""
+    bookmark, want = None, slug.strip().lower()
+    for _ in range(40):
+        opts = {"board_id": board_id, "page_size": 25}
         if bookmark:
             opts["bookmarks"] = [bookmark]
+        try:
+            rr = api(sess, "BoardSectionsResource", opts, source_url, "www/[username]/[slug].js").get("resource_response") or {}
+        except Exception:
+            return None
+        for s in rr.get("data") or []:
+            if isinstance(s, dict) and str(s.get("slug") or "").lower() == want and s.get("id"):
+                return s
+        bookmark = rr.get("bookmark")
+        if not bookmark or bookmark == "-end-":
+            return None
+    return None
+
+
+def _feed(sess, resource, opts, source_url, handler, max_pages=None, found=0, sub=None):
+    """一路翻到 Pinterest 說「沒有了」。回 (rows, 幾個 pin, 是不是中途被擋)；第一頁就讀不到 rows＝None。
+    found：前面已經找到幾個（一個帳號好幾個圖版時，進度訊息接著數）；sub：rows 存進哪個子資料夾。"""
+    rows, seen, bookmark, pins, idle, cut = [], set(), None, 0, 0, False
+    for page_no in range(max_pages or SAFETY_PAGES):
+        o = dict(opts)
+        if bookmark:
+            o["bookmarks"] = [bookmark]
         # 中途某頁讀不到就停＝靜默截斷（以前有人回報「只下載部分幾張」）。大圖版讀到後面常被限流（429）：
         # 分段等久一點再接著讀，每次都講；真的讀不下去才停，而且讓 resolve() 講清楚是被限流、再抓一次會接著補。
         j = None
         for wait in (0, 15, 30, 60):
             if wait:
                 log(f"    第 {page_no + 1} 頁被擋，{wait} 秒後再試…")
-                emit(type="notice", message=T(f"Pinterest 要我們慢一點，{wait} 秒後接著讀（已找到 {pins} 個）",
-                                              f"Pinterest asked us to slow down — continuing in {wait}s ({pins} pins so far)"))
+                emit(type="notice", message=T(f"Pinterest 要我們慢一點，{wait} 秒後接著讀（已找到 {found + pins} 個）",
+                                              f"Pinterest asked us to slow down — continuing in {wait}s ({found + pins} pins so far)"))
                 time.sleep(wait)
             try:
-                j = api(sess, "BoardFeedResource", opts, source_url, "www/[username]/[slug].js")
+                j = api(sess, resource, o, source_url, handler)
                 break
             except urllib.error.HTTPError as e:
                 if e.code not in (429, 500, 502, 503, 504):
@@ -250,8 +329,8 @@ def collect_from_board(sess, final_url, html, max_pages=None):
                 pass                                  # 連線不穩：一樣等一下再試
         if j is None:
             if page_no == 0:
-                return None, name, True, expected
-            collect_from_board.cut = True
+                return None, 0, False
+            cut = True
             log(f"    第 {page_no + 1} 頁一直讀不到，先處理已取得的 {pins} 個")
             break
         rr = j.get("resource_response") or {}
@@ -263,18 +342,98 @@ def collect_from_board(sess, final_url, html, max_pages=None):
             if got:
                 seen.add(str(p["id"]))
                 pins += 1
+                if sub:
+                    for r in got:
+                        r["sub"] = sub
                 rows.extend(got)
         idle = idle + 1 if pins == before else 0
-        log(f"    讀取中… 已找到 {pins} 個 pin")
+        log(f"    讀取中… 已找到 {found + pins} 個 pin")
         if not max_pages and page_no and page_no % 5 == 0:
-            emit(type="notice", message=T(f"讀取圖版清單…已找到 {pins} 個",
-                                          f"Reading the board… {pins} pins so far"))
+            emit(type="notice", message=T(f"讀取圖版清單…已找到 {found + pins} 個",
+                                          f"Reading the board… {found + pins} pins so far"))
         bookmark = rr.get("bookmark") or (rr.get("bookmarks") or [None])[0]
         if not bookmark or bookmark == "-end-" or idle >= 3:
             break
         time.sleep(0.35)
-    collect_from_board.pins = pins
-    return rows, name, True, expected
+    if sub:
+        for k, r in enumerate(rows, 1):
+            r["n"] = k                                # 每個圖版的資料夾各自從 001 數
+    _feed.more = bool(bookmark) and bookmark != "-end-" and idle < 3   # 只讀了前幾頁、後面還有
+    return rows, pins, cut
+
+
+def collect_from_profile(sess, user, tab, max_pages=None):
+    """個人頁。tab＝boards：每個公開圖版（含他參與的共用圖版）都抓，一個圖版一個子資料夾；
+    created：他自己建立的 pin；pins：他存過的全部 pin。回 (rows, 名稱, 預計幾個)。"""
+    try:
+        j = api(sess, "UserResource", {"username": user, "field_set_key": "profile"}, f"/{user}/", "www/[username].js")
+        d = (j.get("resource_response") or {}).get("data") or {}
+    except Exception:
+        d = {}
+    if not d.get("id"):
+        die(T("找不到這個帳號。網址打錯、帳號不存在、或不是公開的都會這樣。",
+              "Account not found. The address may be wrong, or the account doesn't exist or isn't public."))
+    who = (d.get("full_name") or "").strip() or user
+    collect_from_board.cut = False
+
+    if tab in ("created", "pins"):
+        resource = "UserActivityPinsResource" if tab == "created" else "UserPinsResource"
+        rows, pins, cut = _feed(sess, resource, {"username": user, "field_set_key": "grid_item", "page_size": 50},
+                                f"/{user}/_{tab}/", f"www/[username]/_{tab}.js", max_pages)
+        collect_from_board.cut, collect_from_board.pins = cut, pins
+        resolve.more = bool(max_pages) and getattr(_feed, "more", False)   # 預覽只讀第一頁：總數不知道，不報張數
+        name =T(f"{who} 建立的 Pin", f"{who} - created pins") if tab == "created" else T(f"{who} 的 Pin", f"{who} - pins")
+        return rows or [], name, (int(d.get("pin_count") or 0) if tab == "pins" else 0)
+
+    boards, bookmark = [], None
+    for _ in range(SAFETY_PAGES):
+        opts = {"username": user, "page_size": 50, "privacy_filter": "all", "sort": "last_pinned_to",
+                "field_set_key": "profile_grid_item"}
+        if bookmark:
+            opts["bookmarks"] = [bookmark]
+        try:
+            rr = api(sess, "BoardsResource", opts, f"/{user}/", "www/[username].js").get("resource_response") or {}
+        except Exception:
+            break
+        boards += [b for b in rr.get("data") or [] if isinstance(b, dict) and b.get("id") and b.get("type", "board") == "board"]
+        bookmark = rr.get("bookmark")
+        if not bookmark or bookmark == "-end-" or max_pages:
+            break
+    if not boards:
+        die(T("這個帳號沒有公開的圖版。", "This account has no public boards."))
+    expected = sum(int(b.get("pin_count") or 0) for b in boards)
+    collect_from_profile.boards = len(boards)
+    if max_pages:                                     # 預覽：第一個圖版的第一頁就夠（名字、張數、縮圖）
+        b = boards[0]
+        rows, pins, _ = _feed(sess, "BoardFeedResource", _board_opts(b["id"]), b.get("url") or f"/{user}/",
+                              "www/[username]/[slug].js", 1)
+        collect_from_board.pins = pins
+        return rows or [], who, expected
+
+    rows, total, used = [], 0, set()
+    for i, b in enumerate(boards, 1):
+        bname = (b.get("name") or "").strip() or str(b["id"])
+        sub = safe_name(bname, 60, keep_space=True) or str(b["id"])
+        if sub.lower() in used:                       # 兩個圖版同名：後面那個加上 id，不混在同一夾
+            sub = f"{sub} {b['id']}"
+        used.add(sub.lower())
+        log(f"  圖版 {i}/{len(boards)}：{bname}")
+        emit(type="notice", message=T(f"讀第 {i}/{len(boards)} 個圖版：{bname}（已找到 {total} 個）",
+                                      f"Reading board {i}/{len(boards)}: {bname} ({total} pins so far)"))
+        got, pins, cut = _feed(sess, "BoardFeedResource", _board_opts(b["id"]), b.get("url") or f"/{user}/",
+                               "www/[username]/[slug].js", None, found=total, sub=sub)
+        rows += got or []
+        total += pins
+        if cut:
+            collect_from_board.cut = True
+            break
+    collect_from_board.pins = total
+    return rows, who, expected
+
+
+def _board_opts(board_id):
+    return {"add_vase": True, "board_id": str(board_id), "field_set_key": "react_grid_pin", "filter_section_pins": False,
+            "is_react": True, "prepend": False, "page_size": PAGE_SIZE, "redux_normalize_feed": True, "gated": False}
 
 
 def pin_page_row(html):
@@ -347,7 +506,26 @@ def resolve(sess, link, max_pages=None):
         die(T(f"連線失敗：{e}", f"Connection failed: {e}"))
 
     resolve.expected = 0
+    resolve.more = False
+    resolve.label =T("Pinterest 圖版", "Pinterest board")
+    prof = profile_tab(final_url)
+    asked = profile_tab(link)
+    if prof and asked and asked[0].lower() == prof[0].lower():
+        prof = asked                     # 沒帶帳號資料時 /帳號/_created/ 會被導回 /帳號/，照使用者貼的那一頁抓
+    if prof:
+        rows, name, expected = collect_from_profile(sess, prof[0], prof[1], max_pages)
+        resolve.expected = expected
+        resolve.label = T("Pinterest 個人頁", "Pinterest profile")
+        if not rows:
+            die(T("這個帳號讀得到，但一張圖都沒抓到。", "The account opened but no images came back."))
+        pins = getattr(collect_from_board, "pins", 0) or len(rows)
+        if getattr(collect_from_board, "cut", False) and not max_pages:
+            emit(type="notice", message=T(f"Pinterest 暫時限制讀取，先抓已讀到的 {pins} 個；過幾分鐘再抓一次，會接著補完（抓過的會跳過）",
+                                          f"Pinterest is limiting requests — grabbing the {pins} pins read so far. Grab again in a few minutes to get the rest (saved ones are skipped)"))
+        return rows, name, final_url
+
     if "/pin/" in urllib.parse.urlparse(final_url).path:
+        resolve.label = T("Pinterest 單張", "Pinterest pin")
         rows = single_pin_rows(sess, final_url, html)
         if not rows:
             die(T("這張 pin 讀不到。可能不是公開的，或已被刪除。", "Couldn't read this pin. It may not be public, or it was deleted."))
@@ -393,8 +571,7 @@ def grab_pinterest(url, dest, sess):
     pg.log(f"\n  圖版：{name}")
     pg.log(f"  檔數：{len(rows)}" + (f"（其中影片 {nv} 支）" if nv else ""))
     pg.log(f"  存到：{folder}\n")
-    pg.emit(type="source", kind="pinterest", name=name, count=len(rows), folder=folder,
-            label=T("Pinterest 圖版", "Pinterest board") if "/pin/" not in url else T("Pinterest 單張", "Pinterest pin"))
+    pg.emit(type="source", kind="pinterest", name=name, count=len(rows), folder=folder, label=resolve.label)
 
     res = pg.download(rows, folder, dedup=pg.DEDUP)
     pg.log(f"\n  完成 — 新下載 {res.ok} 個"
@@ -416,7 +593,8 @@ def probe(url):
     rows, name, final = resolve(sess, url, max_pages=None if OPT["items"] else 1)
     single = "/pin/" in urllib.parse.urlparse(final).path
     big = max(rows, key=lambda r: (r.get("w") or 0) * (r.get("h") or 0)) if rows else {}
-    out = {"name": name, "count": len(rows) if single else (getattr(resolve, "expected", 0) or len(rows)),
+    count = len(rows) if single else (getattr(resolve, "expected", 0) or len(rows))
+    out = {"name": name, "count": 0 if getattr(resolve, "more", False) else count,
            "thumb": (rows[0].get("thumb") if rows else None), "w": big.get("w"), "h": big.get("h"),
            "page_w": big.get("page_w")}
     if OPT["items"] and not single:

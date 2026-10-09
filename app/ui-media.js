@@ -17,7 +17,8 @@
     '影片抓完，每換一個鏡頭截一張，<br>再拼成一張總覽圖。': 'Grabs the video, saves a frame at every cut,<br>then lays them out on one overview sheet.',
     '不抓影片：標題、觀看數、發布日、留言，<br>整理成一張表。': 'No video: titles, views, dates and comments,<br>organized into a spreadsheet.',
     '另外存 {t} 那一格畫面。': 'Also saves the frame at {t}.',
-    '圖版': 'Board', '貼文': 'Post', '這不是公開的內容': "This isn't public",
+    '圖版': 'Board', '貼文': 'Post', '音檔': 'Audio', '{n} 個音檔': '{n} audio files',
+    '<b>音檔</b><br>直接指到音檔的網址、網頁上的播放器與下載連結、<br>Podcast 訂閱，都存原檔。': '<b>Audio</b><br>A link straight to an audio file, players and download links on a page,<br>podcast feeds — all saved as the original file.', '這不是公開的內容': "This isn't public",
     '自動跟上網站改版': 'Keep up with site changes', '每天在背景更新一次': 'Updates once a day in the background', '已關掉，一直用現在這版': 'Off — always using this version',
     '正在檢查更新…': 'Checking for updates…', '自動更新': 'Auto-update', '狀態': 'Status',
     '影片網站常改版，沒跟上就抓不到。Fully 每天在背景<br>更新一次影片引擎，只連 GitHub，不傳任何東西出去。': "Video sites change often; without updates, grabs break. Fully updates its<br>video engine once a day in the background — it only talks to GitHub and sends nothing out.",
@@ -36,6 +37,11 @@
   const isBoard = h => /(^|\.)pinterest\.[a-z.]+$/.test(h) || h === 'pin.it';
   const isPost = u => /(^|\.)threads\.(net|com)$/.test(hostOf(u)) && /^\/(@[^/]+|t\/[^/]+)/.test((() => { try { return new URL(u).pathname; } catch (e) { return ''; } })());   // 跟 threads_grab.py 的 handles 對齊
   const isVideoFile = u => { try { return /\.(mp4|mov|m4v|webm|mkv|m3u8)$/i.test(new URL(u).pathname); } catch (e) { return false; } };   // 直接指到影片檔（跟 video.py 的 is_video_file 對齊）
+  // 音檔：直接指到音檔、或音樂與 Podcast 平台（跟 audio.py 的 is_audio_file、video.py 的 AUDIO_HOSTS 對齊）
+  const AUDIO_HOSTS = ['soundcloud.com', 'bandcamp.com', 'mixcloud.com', 'audiomack.com', 'podcasts.apple.com'];
+  const isAudioHost = h => AUDIO_HOSTS.some(d => h === d || h.endsWith('.' + d));
+  const isAudioFile = u => { try { return /\.(mp3|m4a|aac|wav|flac|ogg|oga|opus|aiff?|caf|weba)$/i.test(new URL(u).pathname); } catch (e) { return false; } };
+  const AUD = '<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
 
   const GET = { av: '最高畫質，存好直接能播；有中英字幕會一起存。', audio: '存成一首帶封面的音樂檔。',
                 frames: '影片抓完，每換一個鏡頭截一張，<br>再拼成一張總覽圖。', data: '不抓影片：標題、觀看數、發布日、留言，<br>整理成一張表。' };
@@ -125,6 +131,7 @@
       '<b>影片</b><br>上千個影片網站，公開看得到的都行。<br>抓最高畫質，存好直接能播。<br>也可以只要聲音、每個鏡頭截圖、標題與留言。',
       '<b>圖版</b><br>貼圖版的網址，整個圖版讀到底、一張不漏。<br>影片 pin 存影片本身，多頁的 pin 每一頁都存。',
       '<b>任何網頁</b><br>掃出頁面上公開看得到的圖，<br>一張張換成原始尺寸，同時下載。',
+      '<b>音檔</b><br>直接指到音檔的網址、網頁上的播放器與下載連結、<br>Podcast 訂閱，都存原檔。',
       '<b>存下來之前</b><br>複製網址，右上角先跳一張預覽卡：<br>有幾張、能拿到多大、之前抓過沒。<br>只要其中幾張？按「挑幾張」。',
       '<b>存下來之後</b><br>告訴你拿到多大、是頁面上那張的幾倍。<br>單張圖直接在剪貼簿，⌘V 就貼。<br>一模一樣的圖不會存第二份。',
       '<b>順手</b><br>網址帶時間點（t=83）會另存那一格畫面。<br>一次貼很多行會排隊抓；失敗的可以一次重試。<br>追蹤一個網頁、圖版或影片清單，之後只抓新的。<br>右鍵選單「服務 → 用 Fully 抓」也可以。'];
@@ -138,19 +145,30 @@
       const h = hostOf(u);
       if (isVideoHost(h) || isVideoFile(u)) return { label: tr('影片'), kind: 'video' };
       if (pick !== 'av') setPick('av');
+      if (isAudioHost(h) || isAudioFile(u)) return { label: tr('音檔'), kind: 'audio' };
       if (isBoard(h)) return { label: tr('圖版'), kind: 'image' };
       if (isPost(u)) return { label: tr('貼文'), kind: 'image' };
       return null;
     },
     view(kind) { return kind === 'video' ? 'video' : null; },
-    icon(kind) { return kind === 'video' ? VID : null; },
-    histIcon(it) { return /影片|video/i.test(it.kind || '') || /audio|frames|data/.test(it.mode || '') ? VID : null; },
-    startMode(kind) { return (kind === 'video' || kind === '*') ? pick : null; },
+    icon(kind) { return kind === 'video' ? VID : kind === 'audio' ? AUD : null; },
+    histIcon(it) { return /音檔|audio/i.test(it.kind || '') || it.mode === 'audio' ? AUD : /影片|video/i.test(it.kind || '') || /frames|data/.test(it.mode || '') ? VID : null; },
+    startMode(kind) { return kind === 'audio' ? 'audio' : (kind === 'video' || kind === '*') ? pick : null; },
     askVisible(view) { if (view === 'video') { if (!$('get')) mountAsk(); else paintGet(); return true; } return false; },
     paint() {},
     // 預覽卡那行：影片＝長度＋最高畫質；清單＝幾支；不是公開的
     metaLine(p) {
       if (p.not_public) return tr('這不是公開的內容');
+      if (p.audios) {                                   // 音檔：幾個／多長；網頁上圖和音檔混著就兩個都講
+        const n = p.count || 0, a = p.audios, bits = [];
+        if (a < n) {
+          bits.push(tr('{n} 張', { n: n - a }), tr('{n} 個音檔', { n: a }));
+          if (p.w && p.h) bits.push(tr('原圖最大 {w} × {h}', { w: p.w, h: p.h }));
+        } else if (a > 1 || p.list) bits.push(tr('{n} 個音檔', { n: a }));
+        else if (p.duration) bits.push(tr('音檔') + '・' + dur(p.duration));
+        else if (p.bytes) bits.push(tr('音檔') + '・' + (p.bytes >= 1048576 ? (p.bytes / 1048576).toFixed(1) + ' MB' : Math.round(p.bytes / 1024) + ' KB'));
+        return bits.join('・') || tr('音檔');
+      }
       if (!(p.list || p.duration || p.fps)) return null;
       const bits = [];
       if (p.list && p.count) bits.push(tr('{n} 支', { n: p.count }));
@@ -160,7 +178,7 @@
     },
     onSource(ev) { if (ev.kind !== 'video') return false; UI.setText('0%'); UI.running(tr('下載中'), 0); return true; },
     stageText(st) { return /合併|轉檔|處理/.test(st) ? tr('正在轉成能播的格式') : /資料/.test(st) ? tr('正在整理資料') : /抽影格|接觸表|一次看全部/.test(st) ? tr('正在截每個鏡頭') : null; },
-    unit(kind) { return kind === 'video' ? tr('個') : undefined; },
+    unit(kind) { return kind === 'video' || kind === 'audio' ? tr('個') : undefined; },
     doneExtras(ev) { return [ev.frame ? tr('那一格畫面') : '', ev.csv ? tr('一張資料表') : ''].filter(Boolean).join('、'); },
     proofX(ev) { return ev.res ? `${ev.res}${ev.fps > 30 ? ev.fps : ''}${ev.hdr ? ' HDR' : ''}` : ''; },
     noFollow(ev) { return /audio|data|frames/.test(ev.mode || ''); },

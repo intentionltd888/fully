@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import core as pg
 from core import (T, OPT, CUR, BUNDLED_BIN, _host, site_label, picked, img_done, width_hint,
                   sheet_for_images, tag_where_from, _ensure_ca_certs)
+import audio as AUDIO      # 網頁上的音檔（播放器、下載連結、Podcast 訂閱）
 
 import media as EXT        # 影片線與圖版解析（靜態 import 才會被 PyInstaller 收進去）
 try:                      # maxurl（Apache-2.0）的 1 萬多站縮圖→原圖規則，由包內 qjs 離線執行
@@ -363,6 +364,10 @@ def _scan_page(url, sess):
             pass
     rows = _web_rows(cands, final_url)
     preview_only = len(rows) == 1 and any(p == 2 for p, _, _ in cands) and all(p in (2, 4) for p, _, _ in cands)
+    # 網頁上的音檔：跟圖一起存、排在前面（音樂頁的封面、Podcast 的節目圖照樣存）；有音檔就不算「只有預覽圖」
+    arows = AUDIO.rows_for(AUDIO.scan(page, final_url), final_url)
+    if arows:
+        rows, preview_only = arows + rows, False
     return final_url, page, rows, _page_title(page, final_url), preview_only
 
 
@@ -376,12 +381,15 @@ def grab_web(url, dest, sess):
         pg.die(T("這個網頁上抓不到圖片。有些網站的圖要捲動才載入，或不是公開的。",
                  "No images found on this page. Some sites only load images as you scroll, or aren't public."))
 
-    # 行銷頁動輒上百張素材，抓爆沒有意義。設上限並明講砍掉幾張，不要靜靜截斷。
-    if len(rows) > WEB_CAP:
-        pg.log(f"  （找到 {len(rows)} 張，只取可信度最高的前 {WEB_CAP} 張）")
-        rows = rows[:WEB_CAP]
-    rows = picked(rows)
-    _save_rows(rows, dest, name, _host(final_url) or T("網頁", "Web page"), "web", preview_only=preview_only)
+    # 行銷頁動輒上百張素材，抓爆沒有意義。設上限並明講砍掉幾張，不要靜靜截斷。（音檔另有自己的上限，在 audio.py）
+    aud = [r for r in rows if r.get("audio")]
+    img = [r for r in rows if not r.get("audio")]
+    if len(img) > WEB_CAP:
+        pg.log(f"  （找到 {len(img)} 張，只取可信度最高的前 {WEB_CAP} 張）")
+        img = img[:WEB_CAP]
+    rows = picked(aud + img)
+    _save_rows(rows, dest, name, _host(final_url) or T("網頁", "Web page"), "audio" if aud and not img else "web",
+               preview_only=preview_only)
 
 
 def _save_rows(rows, dest, name, label, kind, preview_only=False):
@@ -442,12 +450,16 @@ def _probe_web(url):
     sess = _session()
     final_url, page, rows, name, preview_only = _scan_page(url, sess)
     og = re.search(r'<meta[^>]+(?:property|name)=["\']og:image(?::url)?["\'][^>]+content=["\']([^"\']+)["\']', page or "", re.I)
-    thumb = urllib.parse.urljoin(final_url, htmllib.unescape(og.group(1))) if og else (rows[0]["thumb"] if rows else None)
-    out = {"name": name, "count": min(len(rows), WEB_CAP), "thumb": thumb}
+    thumb = urllib.parse.urljoin(final_url, htmllib.unescape(og.group(1))) if og else next((r["thumb"] for r in rows if r.get("thumb")), None)
+    aud = [r for r in rows if r.get("audio")]
+    rows = aud + [r for r in rows if not r.get("audio")][:WEB_CAP]
+    out = {"name": name, "count": len(rows), "thumb": thumb}
+    if aud:
+        out["audios"] = len(aud)            # 預覽卡：全是音檔講「幾個音檔」，混著圖就兩個都講
     if preview_only:
         out["preview_only"] = True
     if OPT["items"]:
-        out["items"] = [{"id": r["id"], "thumb": r["thumb"], "title": ""} for r in rows[:WEB_CAP]]
+        out["items"] = [{"id": r["id"], "thumb": r["thumb"], "title": r["title"] if r.get("audio") else ""} for r in rows]
     return out
 
 
